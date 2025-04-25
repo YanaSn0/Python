@@ -1,7 +1,11 @@
 Media Processing Script 📹🎵🖼️
+
 Python
+
 License
+
 Dependencies
+
 A versatile Python script (s.py) for downloading, processing, combining, splitting, and creating slideshows from media files (videos, audio, images). Powered by yt-dlp, gallery-dl, and ffmpeg, this tool supports platforms like YouTube, Instagram, and TikTok.
 Features ✨
 
