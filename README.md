@@ -6,7 +6,10 @@ License
 
 Dependencies
 
-A versatile Python script (s.py) for downloading, processing, combining, splitting, and creating slideshows from media files (videos, audio, images). Powered by yt-dlp, gallery-dl, and ffmpeg, this tool supports platforms like YouTube, Instagram, and TikTok.
+A versatile Python script (s.py) for downloading, processing, combining, splitting, and creating slideshows from media files (videos, audio, images). Powered by yt-dlp, gallery-dl, and ffmpeg. 
+
+This tool was tested (a little) on X, Instagram, YouTube, TikTok but should work for 1000's more.
+
 Features ✨
 
     Download: Fetch videos, audio, or images from URLs in urls.txt.
