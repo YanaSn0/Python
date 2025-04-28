@@ -11,7 +11,8 @@ def run_command(command, suppress_errors=False):
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
         if not suppress_errors:
-            print(f"Error: {result.stderr}! You may need to ensure you're logged into the platform on Firefox or use --username and --password with yt-dlp.")
+            error_message = f"Error: {result.stderr}"
+            print(error_message)
         return False, result.stderr
     return True, result.stderr if result.stderr else result.stdout
 
@@ -66,11 +67,43 @@ def get_image_dimensions(image_path):
     return None, None
 
 def find_image_file(image_path):
-    extensions = ['.jpg', '.jpeg', '.png', '.webp']
-    for ext in extensions:
-        full_path = image_path + ext
-        if os.path.exists(full_path):
-            return full_path
+    extensions = ['.jpg', '.jpeg', '.png', '.webp', '.JPG', '.JPEG', '.PNG', '.WEBP']
+    base_name = os.path.basename(image_path).lower()
+    dir_name = os.path.dirname(image_path) or "."
+    dir_name = os.path.abspath(dir_name)
+    print(f"Looking for base name (lowercase): {base_name} in directory: {dir_name}")
+    
+    try:
+        files = os.listdir(dir_name)
+        print(f"Files in directory: {files}")
+        for file in files:
+            file_lower = file.lower()
+            if file_lower.startswith(base_name) and os.path.splitext(file_lower)[1] in [ext.lower() for ext in extensions]:
+                full_path = os.path.join(dir_name, file)
+                print(f"Found matching file: {full_path}")
+                return full_path
+    except Exception as e:
+        print(f"Error listing directory {dir_name}: {e}")
+    return None
+
+def find_video_file(video_path):
+    extensions = ['.mp4', '.MP4']
+    base_name = os.path.basename(video_path).lower()
+    dir_name = os.path.dirname(video_path) or "."
+    dir_name = os.path.abspath(dir_name)
+    print(f"Looking for video base name (lowercase): {base_name} in directory: {dir_name}")
+    
+    try:
+        files = os.listdir(dir_name)
+        print(f"Files in directory: {files}")
+        for file in files:
+            file_lower = file.lower()
+            if file_lower.startswith(base_name) and os.path.splitext(file_lower)[1] in [ext.lower() for ext in extensions]:
+                full_path = os.path.join(dir_name, file)
+                print(f"Found matching video file: {full_path}")
+                return full_path
+    except Exception as e:
+        print(f"Error listing directory {dir_name}: {e}")
     return None
 
 def determine_best_resolution(image_files):
@@ -129,14 +162,12 @@ def determine_best_resolution(image_files):
     return max_width, max_height
 
 def is_video_platform(url):
-    """Determine if the URL is from a platform where the primary content is typically a video."""
     video_domains = ['youtube.com', 'youtu.be', 'tiktok.com', 'vimeo.com', 'dailymotion.com', 'x.com', 'twitter.com']
     parsed_url = urllib.parse.urlparse(url)
     domain = parsed_url.netloc.lower()
     return any(video_domain in domain for video_domain in video_domains)
 
 def is_instagram_url(url):
-    """Determine if the URL is from Instagram."""
     parsed_url = urllib.parse.urlparse(url)
     domain = parsed_url.netloc.lower()
     return 'instagram.com' in domain
@@ -193,7 +224,11 @@ def main():
         for image_path in image_paths:
             image_file = find_image_file(image_path)
             if not image_file:
-                print(f"Error: Image file {image_path} not found (tried .jpg, .jpeg, .png, .webp).")
+                extensions = ['.jpg', '.jpeg', '.png', '.webp', '.JPG', '.JPEG', '.PNG', '.WEBP']
+                dir_name = os.path.abspath(os.path.dirname(image_path) or ".")
+                base_name = os.path.basename(image_path)
+                tried_paths = [os.path.join(dir_name, f"{base_name}{ext}") for ext in extensions]
+                print(f"Error: Image file {image_path} not found. Tried: {', '.join(tried_paths)}")
                 sys.exit(1)
             image_files.append(image_file)
 
@@ -217,7 +252,7 @@ def main():
                 )
                 success, output = run_command(ffmpeg_cmd)
                 if not success:
-                    print(f"Failed to process image {image_file}.")
+                    print(f"Failed to process image {image_file}. FFmpeg output: {output}")
                     sys.exit(1)
 
             concat_list = os.path.join(temp_image_dir, "concat_list.txt")
@@ -232,11 +267,11 @@ def main():
             print(f"Output will be saved as {output_name_with_ext}")
 
             ffmpeg_cmd = (
-                f'ffmpeg -f concat -safe 0 -i "{concat_list}" -c:v libx264 -b:v 3500k -r 30 -pix_fmt yuv420p "{output_name}.mp4"'
+                f'ffmpeg -f concat -safe 0 -i "{concat_list}" -c:v libx264 -profile:v baseline -level 4.0 -b:v 3500k -r 30 -pix_fmt yuv420p "{output_name}.mp4"'
             )
             success, output = run_command(ffmpeg_cmd)
             if not success:
-                print(f"Failed to create slideshow video.")
+                print(f"Failed to create slideshow video. FFmpeg output: {output}")
                 sys.exit(1)
 
             print(f"Done! Output saved in {output_dir}")
@@ -266,6 +301,7 @@ def main():
             loop = 0
         else:
             loop = int(duration / audio_duration) + 1 if audio_duration < duration else 0
+            print(f"Audio duration: {audio_duration} seconds, looping {loop} times to reach at least {duration} seconds.")
 
         output_name_with_ext, output_name_base = get_next_available_name(output_dir, "L", ".m4a")[:2]
         output_name = os.path.join(output_dir, output_name_base)
@@ -273,11 +309,11 @@ def main():
         print(f"Output will be saved as {output_name_with_ext}")
 
         ffmpeg_cmd = (
-            f'ffmpeg -i "{audio_path}" -stream_loop {loop} -c:a copy -t {duration} "{output_name}.m4a"'
+            f'ffmpeg -stream_loop {loop} -i "{audio_path}" -c:a copy -t {duration} "{output_name}.m4a"'
         )
         success, output = run_command(ffmpeg_cmd)
         if not success:
-            print(f"Failed to loop audio.")
+            print(f"Failed to loop audio. FFmpeg output: {output}")
             sys.exit(1)
 
         print(f"Done! Output saved in {output_dir}")
@@ -313,12 +349,13 @@ def main():
         print(f"Output will be saved as {output_name_with_ext}")
 
         ffmpeg_cmd = (
-            f'ffmpeg -i "{video_path}" -stream_loop {loop} -i "{audio_path}" -c:v copy '
+            f'ffmpeg -i "{video_path}" -stream_loop {loop} -i "{audio_path}" '
+            f'-c:v libx264 -profile:v baseline -level 4.0 -b:v 3500k -r 30 -pix_fmt yuv420p '
             f'-c:a aac -b:a 128k -ar 44100 -shortest -t {video_duration if video_duration > 0 else 140} "{output_name}.mp4"'
         )
         success, output = run_command(ffmpeg_cmd)
         if not success:
-            print(f"Failed to combine files.")
+            print(f"Failed to combine files. FFmpeg output: {output}")
             sys.exit(1)
 
         print(f"Done! Output saved in {output_dir}")
@@ -328,8 +365,12 @@ def main():
         input_path = args.input_path + ".mp4"
         output_dir = args.output_dir if args.output_dir else os.path.dirname(input_path)
 
-        if not os.path.exists(input_path):
-            print(f"Error: Input file {input_path} not found.")
+        actual_input_path = find_video_file(args.input_path)
+        if not actual_input_path:
+            dir_name = os.path.abspath(os.path.dirname(input_path) or ".")
+            base_name = os.path.basename(input_path)
+            tried_paths = [os.path.join(dir_name, f"{base_name}{ext}") for ext in ['.mp4', '.MP4']]
+            print(f"Error: Input file {input_path} not found. Tried: {', '.join(tried_paths)}")
             sys.exit(1)
 
         if not os.path.exists(output_dir):
@@ -337,7 +378,7 @@ def main():
             print(f"Created output directory: {output_dir}")
 
         cmd = (
-            f'ffprobe -v error -show_streams -select_streams a -of default=noprint_wrappers=1 "{input_path}"'
+            f'ffprobe -v error -show_streams -select_streams a -of default=noprint_wrappers=1 "{actual_input_path}"'
         )
         success, output = run_command(cmd)
         has_audio = bool(output.strip())
@@ -347,20 +388,20 @@ def main():
         video_output = os.path.join(output_dir, video_name_base)
         audio_output = os.path.join(output_dir, audio_name_base)
 
-        print(f"Splitting {input_path}...")
+        print(f"Splitting {actual_input_path}...")
         print(f"Outputs will be saved as {video_name_with_ext} and {audio_name_with_ext if has_audio else '(no audio)'}")
 
         ffmpeg_video_cmd = (
-            f'ffmpeg -i "{input_path}" -c:v copy -an "{video_output}.mp4"'
+            f'ffmpeg -i "{actual_input_path}" -c:v copy -an "{video_output}.mp4"'
         )
-        success, output = run_command(ffmpeg_cmd)
+        success, output = run_command(ffmpeg_video_cmd)
         if not success:
             print(f"Failed to extract video.")
             sys.exit(1)
 
         if has_audio:
             ffmpeg_audio_cmd = (
-                f'ffmpeg -i "{input_path}" -vn -c:a copy "{audio_output}.m4a"'
+                f'ffmpeg -i "{actual_input_path}" -vn -c:a copy "{audio_output}.m4a"'
             )
             success, output = run_command(ffmpeg_audio_cmd)
             if not success:
@@ -412,8 +453,7 @@ def main():
         print(f"Error: {url_file} is empty. Add URLs to the file.")
         sys.exit(1)
 
-    # Deduplicate URLs to prevent processing the same URL multiple times
-    unique_urls = list(dict.fromkeys(urls))  # Preserves order while removing duplicates
+    unique_urls = list(dict.fromkeys(urls))
     if len(unique_urls) < len(urls):
         print(f"Removed {len(urls) - len(unique_urls)} duplicate URLs from processing.")
 
@@ -421,26 +461,22 @@ def main():
     temp_audio_file = os.path.join(output_dir, "temp_audio.m4a")
     temp_image_dir = os.path.join(output_dir, "temp_images")
 
-    current_v_number = 1  # For video-only downloads (V1 to V5)
-    current_o_number = 1  # For videos with audio (O1 to O5 or U1 to U5)
-    current_a_number = 1  # For audio (A1 to A5)
-    current_p_number = 1  # For pictures (P1)
-    audio_counter = 1     # To track the sequence of successful audio downloads
+    current_v_number = 1
+    current_o_number = 1
+    current_a_number = 1
+    current_p_number = 1
+    audio_counter = 1
 
-    # Track processed URLs and their output types to avoid duplicates
-    processed_urls = {}  # URL -> list of output types ('O', 'P', 'V', 'A')
+    processed_urls = {}
 
     for index, url in enumerate(unique_urls):
         print(f"\nProcessing {submode} {index + 1}/{len(unique_urls)}: {url}")
 
-        # Initialize the list of output types for this URL
         if url not in processed_urls:
             processed_urls[url] = []
 
-        # Reset video_downloaded_path for this URL
         video_downloaded_path = None
 
-        # Clean up temporary files from previous iterations
         if os.path.exists(temp_file):
             os.remove(temp_file)
         if os.path.exists(temp_audio_file):
@@ -464,8 +500,7 @@ def main():
             elif submode == "split":
                 prefix = "O" if keep_original else "U"
                 extension = "_video.mp4"
-            else:  # all, all+a, all+a+v, all+v
-                # We'll set prefixes dynamically in the loop
+            else:
                 pass
 
             if submode not in ["all", "all+a", "all+a+v", "all+v"]:
@@ -480,10 +515,9 @@ def main():
                 print(f"Outputs will be saved as {output_name}_video.mp4 and {output_name}_audio.m4a")
             elif submode == "pic":
                 print(f"Output will be saved as {output_name_with_ext}")
-            else:  # all, all+a, all+a+v, all+v
+            else:
                 print("Checking for Original, Picture, Video, or Audio...")
 
-            # Determine authentication method
             if username and password:
                 auth = f"--username {username} --password {password}"
             elif cookies:
@@ -492,7 +526,6 @@ def main():
                 auth = "--cookies-from-browser firefox"
 
             if submode in ["all", "all+a", "all+a+v", "all+v"]:
-                # Step 1: Try to download full video (O1.mp4 to O5.mp4 or U1.mp4 to U5.mp4)
                 if 'O' not in processed_urls[url]:
                     video_prefix = "O" if keep_original else "U"
                     output_name_with_ext, output_name_base, current_o_number = get_next_available_name(output_dir, video_prefix, ".mp4", start_num=current_o_number)
@@ -500,12 +533,9 @@ def main():
                     output_path = os.path.join(output_dir, output_name_with_ext)
 
                     yt_dlp_cmd = (
-                        f'yt-dlp '  # Assumes yt-dlp is in the system PATH
-                        f'{auth} -f "bestvideo+bestaudio/best" --merge-output-format mp4 -o "{temp_file}" "{url}"'
+                        f'yt-dlp {auth} -f "bestvideo+bestaudio/best" --merge-output-format mp4 -o "{temp_file}" "{url}"'
                     )
-                    # Run the command with error suppression to avoid premature failure messages
                     success, output = run_command(yt_dlp_cmd, suppress_errors=True)
-                    # Check if the file was actually created, regardless of the command's reported success
                     if os.path.exists(temp_file):
                         success = True
                         print(f"Video download succeeded: {temp_file} exists.")
@@ -539,20 +569,16 @@ def main():
                                 if os.path.exists(temp_file):
                                     os.remove(temp_file)
                                 continue
-                        video_downloaded_path = output_path  # Store the path for potential audio extraction or splitting
+                        video_downloaded_path = output_path
                         processed_urls[url].append('O')
 
-                # If an 'O' file was saved, skip Steps 2, 3, and 4
                 if 'O' in processed_urls[url]:
                     if submode in ["all+a", "all+a+v", "all+v"]:
-                        # Proceed to audio extraction (for all+a, all+a+v) or video splitting (for all+a+v, all+v) below
                         pass
                     else:
-                        continue  # In 'all' mode, we're done with this URL
+                        continue
 
-                # Step 2: If video fails, try to download picture (P1.jpg)
                 if 'P' not in processed_urls[url] and 'O' not in processed_urls[url]:
-                    # Skip picture download for video platforms if video/audio was attempted
                     if is_video_platform(url) and ('V' in processed_urls[url] or 'A' in processed_urls[url]):
                         print("Skipping picture download for video platform after video/audio attempt...")
                     else:
@@ -571,7 +597,7 @@ def main():
                         if success:
                             image_files = sorted(glob.glob(os.path.join(temp_image_dir, "*")))
                             if image_files:
-                                image_file = image_files[0]  # Take the first image
+                                image_file = image_files[0]
                                 if keep_original:
                                     ext = os.path.splitext(image_file)[1]
                                     os.rename(image_file, output_path)
@@ -591,7 +617,7 @@ def main():
                                 shutil.rmtree(temp_image_dir)
                                 processed_urls[url].append('P')
                                 if submode == "all":
-                                    continue  # Picture downloaded, skip other steps unless in all+a, all+a+v, or all+v mode
+                                    continue
                             else:
                                 shutil.rmtree(temp_image_dir)
                         else:
@@ -599,7 +625,6 @@ def main():
                             if os.path.exists(temp_image_dir):
                                 shutil.rmtree(temp_image_dir)
 
-                # Step 3: If picture fails or is skipped, try to download video-only (V1.mp4 to V5.mp4)
                 if 'V' not in processed_urls[url] and 'O' not in processed_urls[url] and 'P' not in processed_urls[url]:
                     print("Picture download failed or skipped, attempting to download video-only...")
                     output_name_with_ext, output_name_base, current_v_number = get_next_available_name(output_dir, "V", ".mp4", start_num=current_v_number)
@@ -607,8 +632,7 @@ def main():
                     output_path = os.path.join(output_dir, output_name_with_ext)
 
                     yt_dlp_cmd = (
-                        f'yt-dlp '  # Assumes yt-dlp is in the system PATH
-                        f'{auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{url}"'
+                        f'yt-dlp {auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{url}"'
                     )
                     success, output = run_command(yt_dlp_cmd)
                     if success and os.path.exists(temp_file):
@@ -634,9 +658,8 @@ def main():
                                 continue
                         processed_urls[url].append('V')
                         if submode == "all":
-                            continue  # Video-only downloaded, skip other steps unless in all+a, all+a+v, or all+v mode
+                            continue
 
-                # Step 4: If video-only fails, try to download audio (A1.m4a to A5.m4a)
                 if 'A' not in processed_urls[url] and 'O' not in processed_urls[url] and 'P' not in processed_urls[url]:
                     print("Video-only download failed, attempting to download audio...")
                     output_name_with_ext, output_name_base, current_a_number = get_next_available_name(output_dir, "A", ".m4a", start_num=audio_counter, force_num=True)
@@ -644,17 +667,14 @@ def main():
                     output_path = os.path.join(output_dir, output_name_with_ext)
 
                     yt_dlp_cmd = (
-                        f'yt-dlp '  # Assumes yt-dlp is in the system PATH
-                        f'{auth} -f "bestaudio/best" -o "{temp_audio_file}" "{url}"'
+                        f'yt-dlp {auth} -f "bestaudio/best" -o "{temp_audio_file}" "{url}"'
                     )
                     success, output = run_command(yt_dlp_cmd)
                     if success and os.path.exists(temp_audio_file):
-                        # Check if the downloaded file has a video stream
                         has_video = has_video_stream(temp_audio_file)
                         has_audio = has_audio_stream(temp_audio_file)
                         if has_video and has_audio and 'O' not in processed_urls[url]:
                             print("Downloaded file contains both video and audio streams, treating as original...")
-                            # Treat as an original file (save as O#.mp4)
                             video_prefix = "O" if keep_original else "U"
                             video_output_name_with_ext, video_output_name_base, current_o_number = get_next_available_name(output_dir, video_prefix, ".mp4", start_num=current_o_number)
                             video_output_path = os.path.join(output_dir, video_output_name_with_ext)
@@ -678,11 +698,10 @@ def main():
                                     if os.path.exists(temp_audio_file):
                                         os.remove(temp_audio_file)
                                     continue
-                            video_downloaded_path = video_output_path  # Store for potential audio extraction or splitting
+                            video_downloaded_path = video_output_path
                             processed_urls[url].append('O')
                         elif has_video and 'V' not in processed_urls[url]:
                             print("Downloaded file contains a video stream, treating as video...")
-                            # Treat as a video file (save as V#.mp4)
                             video_output_name_with_ext, video_output_name_base, current_v_number = get_next_available_name(output_dir, "V", ".mp4", start_num=current_v_number)
                             video_output_path = os.path.join(output_dir, video_output_name_with_ext)
                             if keep_original:
@@ -707,14 +726,13 @@ def main():
                                     continue
                             processed_urls[url].append('V')
                         else:
-                            # No video stream, treat as audio
                             ffmpeg_cmd = (
                                 f'ffmpeg -i "{temp_audio_file}" -c:a aac -b:a 128k "{output_path}"'
                             )
                             success, output = run_command(ffmpeg_cmd)
                             if success:
                                 print(f"Saved Audio as {output_path}")
-                                audio_counter += 1  # Increment only on successful audio download
+                                audio_counter += 1
                                 if os.path.exists(temp_audio_file):
                                     os.remove(temp_audio_file)
                                 processed_urls[url].append('A')
@@ -728,11 +746,9 @@ def main():
                         print(f"Try debugging with: yt-dlp --list-formats {url}")
                         if os.path.exists(temp_audio_file):
                             os.remove(temp_audio_file)
-                        continue  # Audio downloaded or failed, move to next URL
+                        continue
 
-                # Step 5: In all+a or all+a+v mode, attempt to extract audio if not already done
                 if submode in ["all+a", "all+a+v"] and 'A' not in processed_urls[url]:
-                    # If an 'O' file exists, extract audio from it
                     if 'O' in processed_urls[url] and video_downloaded_path and has_audio_stream(video_downloaded_path):
                         output_name_with_ext, output_name_base, current_a_number = get_next_available_name(output_dir, "A", ".m4a", start_num=audio_counter, force_num=True)
                         output_name = os.path.join(output_dir, output_name_base)
@@ -745,12 +761,11 @@ def main():
                         success, output = run_command(ffmpeg_cmd)
                         if success:
                             print(f"Saved Audio as {output_path}")
-                            audio_counter += 1  # Increment on successful audio extraction
+                            audio_counter += 1
                             processed_urls[url].append('A')
                         else:
                             print(f"Failed to extract audio from video: {video_downloaded_path}")
                     else:
-                        # If no 'O' file, try downloading audio separately (but only if no 'P' file exists)
                         if 'P' in processed_urls[url]:
                             print("Skipping audio download as a picture was already downloaded for this URL...")
                             continue
@@ -761,17 +776,14 @@ def main():
 
                         print("Attempting to download separate audio...")
                         yt_dlp_cmd = (
-                            f'yt-dlp '  # Assumes yt-dlp is in the system PATH
-                            f'{auth} -f "bestaudio/best" -o "{temp_audio_file}" "{url}"'
+                            f'yt-dlp {auth} -f "bestaudio/best" -o "{temp_audio_file}" "{url}"'
                         )
                         success, output = run_command(yt_dlp_cmd)
                         if success and os.path.exists(temp_audio_file):
-                            # Check if the downloaded file has a video stream
                             has_video = has_video_stream(temp_audio_file)
                             has_audio = has_audio_stream(temp_audio_file)
                             if has_video and has_audio and 'O' not in processed_urls[url]:
                                 print("Downloaded file contains both video and audio streams, treating as original...")
-                                # Treat as an original file (save as O#.mp4)
                                 video_prefix = "O" if keep_original else "U"
                                 video_output_name_with_ext, video_output_name_base, current_o_number = get_next_available_name(output_dir, video_prefix, ".mp4", start_num=current_o_number)
                                 video_output_path = os.path.join(output_dir, video_output_name_with_ext)
@@ -797,7 +809,6 @@ def main():
                                         continue
                                 video_downloaded_path = video_output_path
                                 processed_urls[url].append('O')
-                                # Since we now have an 'O' file, extract audio from it (for all+a or all+a+v)
                                 if submode in ["all+a", "all+a+v"]:
                                     print(f"Extracting audio from newly downloaded video: {video_downloaded_path}")
                                     ffmpeg_cmd = (
@@ -812,7 +823,6 @@ def main():
                                         print(f"Failed to extract audio from video: {video_downloaded_path}")
                             elif has_video and 'V' not in processed_urls[url]:
                                 print("Downloaded file contains a video stream, treating as video...")
-                                # Treat as a video file (save as V#.mp4)
                                 video_output_name_with_ext, video_output_name_base, current_v_number = get_next_available_name(output_dir, "V", ".mp4", start_num=current_v_number)
                                 video_output_path = os.path.join(output_dir, video_output_name_with_ext)
                                 if keep_original:
@@ -837,7 +847,6 @@ def main():
                                         continue
                                 processed_urls[url].append('V')
                             else:
-                                # No video stream, treat as audio
                                 ffmpeg_cmd = (
                                     f'ffmpeg -i "{temp_audio_file}" -c:a aac -b:a 128k "{output_path}"'
                                 )
@@ -858,7 +867,6 @@ def main():
                             if os.path.exists(temp_audio_file):
                                 os.remove(temp_audio_file)
 
-                # Step 6: In all+a+v or all+v mode, split the original video into a video-only file (V#.mp4)
                 if submode in ["all+a+v", "all+v"] and 'O' in processed_urls[url] and 'V' not in processed_urls[url]:
                     output_name_with_ext, output_name_base, current_v_number = get_next_available_name(output_dir, "V", ".mp4", start_num=current_v_number)
                     output_name = os.path.join(output_dir, output_name_base)
@@ -876,7 +884,6 @@ def main():
                         print(f"Failed to split video to remove audio: {video_downloaded_path}")
 
         finally:
-            # Final cleanup
             if os.path.exists(temp_file):
                 print("Cleaning up temporary video file...")
                 os.remove(temp_file)
