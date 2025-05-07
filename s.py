@@ -467,7 +467,7 @@ def main():
         ffmpeg_video_cmd = (
             f'ffmpeg -i "{actual_input_path}" -c:v copy -an "{video_output}.mp4"'
         )
-        success, output = run_command(ffmpeg_video_cmd)
+        success, output = run_command(ffmpeg_cmd)
         if not success:
             print(f"Failed to extract video.")
             sys.exit(1)
@@ -476,7 +476,7 @@ def main():
             ffmpeg_audio_cmd = (
                 f'ffmpeg -i "{actual_input_path}" -vn -c:a copy "{audio_output}.m4a"'
             )
-            success, output = run_command(ffmpeg_audio_cmd)
+            success, output = run_command(ffmpeg_cmd)
             if not success:
                 print(f"Failed to extract audio.")
                 if os.path.exists(f"{video_output}.mp4"):
@@ -758,7 +758,9 @@ def main():
                     output_path = os.path.join(output_dir, output_name_with_ext)
 
                     yt_dlp_cmd = (
-                        f'yt-dlp {auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{-                        success, output = run_command(yt_dlp_cmd)
+                        f'yt-dlp {auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{url}"'
+                    )
+                    success, output = run_command(yt_dlp_cmd)
                     if success and os.path.exists(temp_file):
                         if keep_original:
                             os.rename(temp_file, output_path)
