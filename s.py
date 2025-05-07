@@ -66,6 +66,20 @@ def get_image_dimensions(image_path):
         return width, height
     return None, None
 
+def get_video_dimensions(video_path):
+    cmd = (
+        f'ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json "{video_path}"'
+    )
+    success, output = run_command(cmd)
+    if success:
+        data = json.loads(output)
+        if data.get('streams'):
+            width = data['streams'][0]['width']
+            height = data['streams'][0]['height']
+            return width, height
+    print(f"Warning: Could not determine dimensions of {video_path}. Using default 1920x1080.")
+    return 1920, 1080
+
 def find_image_file(image_path):
     extensions = ['.jpg', '.jpeg', '.png', '.webp', '.JPG', '.JPEG', '.PNG', '.WEBP']
     base_name = os.path.basename(image_path).lower()
@@ -173,7 +187,7 @@ def is_instagram_url(url):
     return 'instagram.com' in domain
 
 def main():
-    parser = argparse.ArgumentParser(description="Download, process, combine, or create slideshows from media files")
+    parser = argparse.ArgumentParser(description="Download, process, combine, create slideshows, or batch convert media files")
     subparsers = parser.add_subparsers(dest="mode", help="Mode of operation")
 
     parser_download = subparsers.add_parser("download", help="Download and process videos/images")
@@ -212,8 +226,67 @@ def main():
     parser_loop.add_argument("--output-dir", "-o",
                              help="Directory where output will be saved (default: same as audio file directory)")
 
+    parser_batch_convert = subparsers.add_parser("batch_convert", help="Convert existing videos to Universal format")
+    parser_batch_convert.add_argument("input_dir", help="Directory containing input video files (e.g., ./videos)")
+    parser_batch_convert.add_argument("--output-dir", "-o", default=".",
+                                     help="Directory to save converted files (default: current directory)")
+
     args = parser.parse_args()
     mode = args.mode
+
+    if mode == "batch_convert":
+        input_dir = os.path.abspath(args.input_dir)
+        output_dir = os.path.abspath(args.output_dir if args.output_dir else input_dir)
+
+        if not os.path.exists(input_dir):
+            print(f"Error: Input directory {input_dir} does not exist.")
+            sys.exit(1)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created output directory: {output_dir}")
+
+        video_files = glob.glob(os.path.join(input_dir, "*.mp4"))
+        if not video_files:
+            print(f"Error: No .mp4 files found in {input_dir}.")
+            sys.exit(1)
+
+        print(f"Found {len(video_files)} video files to convert.")
+
+        current_u_number = 1
+        for video_file in video_files:
+            print(f"\nConverting {video_file} to Universal format...")
+            width, height = get_video_dimensions(video_file)
+            width = width + (width % 2)
+            height = height + (height % 2)
+            aspect_ratio = width / height
+            if aspect_ratio > 1.5:
+                target_width, target_height = min(width, 1920), min(height, 1080)
+            elif aspect_ratio < 0.67:
+                target_width, target_height = min(width, 1080), min(height, 1920)
+            else:
+                target_width, target_height = min(width, 1080), min(height, 1080)
+            target_width = target_width + (target_width % 2)
+            target_height = target_height + (target_height % 2)
+
+            output_name_with_ext, output_name_base, current_u_number = get_next_available_name(
+                output_dir, "U", ".mp4", start_num=current_u_number
+            )
+            output_path = os.path.join(output_dir, output_name_with_ext)
+
+            ffmpeg_cmd = (
+                f'ffmpeg -i "{video_file}" -c:v libx264 -b:v 3500k '
+                f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                f'-c:a aac -b:a 128k -ar 44100 -t 140 "{output_path}"'
+            )
+            success, output = run_command(ffmpeg_cmd)
+            if success:
+                print(f"Saved Universal as {output_path}")
+            else:
+                print(f"Failed to convert {video_file}: {output}")
+
+        print(f"Done! Converted files saved in {output_dir}")
+        return
 
     if mode == "slide":
         delay = args.delay
@@ -550,20 +623,73 @@ def main():
 
                     if success:
                         if keep_original:
-                            os.rename(temp_file, output_path)
-                            print(f"Saved Original as {output_path}")
+                            cmd = (
+                                f'ffprobe -v error -show_streams -select_streams v:0 -show_entries stream=codec_name -of json "{temp_file}"'
+                            )
+                            success, output = run_command(cmd)
+                            video_codec = None
+                            if success:
+                                data = json.loads(output)
+                                if data.get('streams'):
+                                    video_codec = data['streams'][0].get('codec_name')
+
+                            cmd = (
+                                f'ffprobe -v error -show_streams -select_streams a:0 -show_entries stream=codec_name -of json "{temp_file}"'
+                            )
+                            success, output = run_command(cmd)
+                            audio_codec = None
+                            if success:
+                                data = json.loads(output)
+                                if data.get('streams'):
+                                    audio_codec = data['streams'][0].get('codec_name')
+
+                            if video_codec == 'h264' and (audio_codec == 'aac' or not audio_codec):
+                                os.rename(temp_file, output_path)
+                                print(f"Saved Original as {output_path}")
+                            else:
+                                print("Original video has incompatible codecs (requires H.264/AAC). Converting...")
+                                width, height = get_video_dimensions(temp_file)
+                                width = width + (width % 2)
+                                height = height + (height % 2)
+                                ffmpeg_cmd = (
+                                    f'ffmpeg -i "{temp_file}" -c:v libx264 -b:v 3500k '
+                                    f'-vf "scale={width}:{height}:force_original_aspect_ratio=decrease" -r 30 '
+                                    f'-c:a aac -b:a 128k -ar 44100 -t 140 "{output_path}"'
+                                )
+                                success, output = run_command(ffmpeg_cmd)
+                                if success:
+                                    if os.path.exists(temp_file):
+                                        os.remove(temp_file)
+                                    print(f"Saved Converted Original as {output_path}")
+                                else:
+                                    print(f"Failed to convert: {url}")
+                                    if os.path.exists(temp_file):
+                                        os.remove(temp_file)
+                                    continue
                         else:
                             print("Converting to universal combined format...")
+                            width, height = get_video_dimensions(temp_file)
+                            width = width + (width % 2)
+                            height = height + (height % 2)
+                            aspect_ratio = width / height
+                            if aspect_ratio > 1.5:
+                                target_width, target_height = min(width, 1920), min(height, 1080)
+                            elif aspect_ratio < 0.67:
+                                target_width, target_height = min(width, 1080), min(height, 1920)
+                            else:
+                                target_width, target_height = min(width, 1080), min(height, 1080)
+                            target_width = target_width + (target_width % 2)
+                            target_height = target_height + (target_height % 2)
                             ffmpeg_cmd = (
                                 f'ffmpeg -i "{temp_file}" -c:v libx264 -b:v 3500k '
-                                f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                 f'-c:a aac -b:a 128k -ar 44100 -t 140 "{output_path}"'
                             )
                             success, output = run_command(ffmpeg_cmd)
                             if success:
                                 if os.path.exists(temp_file):
                                     os.remove(temp_file)
-                                print(f"Saved Original as {output_path}")
+                                print(f"Saved Universal as {output_path}")
                             else:
                                 print(f"Failed to convert: {url}")
                                 if os.path.exists(temp_file):
@@ -632,18 +758,28 @@ def main():
                     output_path = os.path.join(output_dir, output_name_with_ext)
 
                     yt_dlp_cmd = (
-                        f'yt-dlp {auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{url}"'
-                    )
-                    success, output = run_command(yt_dlp_cmd)
+                        f'yt-dlp {auth} -f "bestvideo[ext=mp4]" --merge-output-format mp4 -o "{temp_file}" "{-                        success, output = run_command(yt_dlp_cmd)
                     if success and os.path.exists(temp_file):
                         if keep_original:
                             os.rename(temp_file, output_path)
                             print(f"Saved Video as {output_path}")
                         else:
                             print("Converting to universal video-only format...")
+                            width, height = get_video_dimensions(temp_file)
+                            width = width + (width % 2)
+                            height = height + (height % 2)
+                            aspect_ratio = width / height
+                            if aspect_ratio > 1.5:
+                                target_width, target_height = min(width, 1920), min(height, 1080)
+                            elif aspect_ratio < 0.67:
+                                target_width, target_height = min(width, 1080), min(height, 1920)
+                            else:
+                                target_width, target_height = min(width, 1080), min(height, 1080)
+                            target_width = target_width + (target_width % 2)
+                            target_height = target_height + (target_height % 2)
                             ffmpeg_cmd = (
                                 f'ffmpeg -i "{temp_file}" -c:v libx264 -b:v 3500k '
-                                f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                 f'-an -t 140 "{output_path}"'
                             )
                             success, output = run_command(ffmpeg_cmd)
@@ -683,9 +819,21 @@ def main():
                                 print(f"Saved Original as {video_output_path}")
                             else:
                                 print("Converting to universal combined format...")
+                                width, height = get_video_dimensions(temp_audio_file)
+                                width = width + (width % 2)
+                                height = height + (height % 2)
+                                aspect_ratio = width / height
+                                if aspect_ratio > 1.5:
+                                    target_width, target_height = min(width, 1920), min(height, 1080)
+                                elif aspect_ratio < 0.67:
+                                    target_width, target_height = min(width, 1080), min(height, 1920)
+                                else:
+                                    target_width, target_height = min(width, 1080), min(height, 1080)
+                                target_width = target_width + (target_width % 2)
+                                target_height = target_height + (target_height % 2)
                                 ffmpeg_cmd = (
                                     f'ffmpeg -i "{temp_audio_file}" -c:v libx264 -b:v 3500k '
-                                    f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                    f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                     f'-c:a aac -b:a 128k -ar 44100 -t 140 "{video_output_path}"'
                                 )
                                 success, output = run_command(ffmpeg_cmd)
@@ -709,9 +857,21 @@ def main():
                                 print(f"Saved Video as {video_output_path}")
                             else:
                                 print("Converting to universal video-only format...")
+                                width, height = get_video_dimensions(temp_audio_file)
+                                width = width + (width % 2)
+                                height = height + (height % 2)
+                                aspect_ratio = width / height
+                                if aspect_ratio > 1.5:
+                                    target_width, target_height = min(width, 1920), min(height, 1080)
+                                elif aspect_ratio < 0.67:
+                                    target_width, target_height = min(width, 1080), min(height, 1920)
+                                else:
+                                    target_width, target_height = min(width, 1080), min(height, 1080)
+                                target_width = target_width + (target_width % 2)
+                                target_height = target_height + (target_height % 2)
                                 ffmpeg_cmd = (
                                     f'ffmpeg -i "{temp_audio_file}" -c:v libx264 -b:v 3500k '
-                                    f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                    f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                     f'-t 140 "{video_output_path}"'
                                 )
                                 success, output = run_command(ffmpeg_cmd)
@@ -792,9 +952,21 @@ def main():
                                     print(f"Saved Original as {video_output_path}")
                                 else:
                                     print("Converting to universal combined format...")
+                                    width, height = get_video_dimensions(temp_audio_file)
+                                    width = width + (width % 2)
+                                    height = height + (height % 2)
+                                    aspect_ratio = width / height
+                                    if aspect_ratio > 1.5:
+                                        target_width, target_height = min(width, 1920), min(height, 1080)
+                                    elif aspect_ratio < 0.67:
+                                        target_width, target_height = min(width, 1080), min(height, 1920)
+                                    else:
+                                        target_width, target_height = min(width, 1080), min(height, 1080)
+                                    target_width = target_width + (target_width % 2)
+                                    target_height = target_height + (target_height % 2)
                                     ffmpeg_cmd = (
                                         f'ffmpeg -i "{temp_audio_file}" -c:v libx264 -b:v 3500k '
-                                        f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                        f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                         f'-c:a aac -b:a 128k -ar 44100 -t 140 "{video_output_path}"'
                                     )
                                     success, output = run_command(ffmpeg_cmd)
@@ -830,9 +1002,21 @@ def main():
                                     print(f"Saved Video as {video_output_path}")
                                 else:
                                     print("Converting to universal video-only format...")
+                                    width, height = get_video_dimensions(temp_audio_file)
+                                    width = width + (width % 2)
+                                    height = height + (height % 2)
+                                    aspect_ratio = width / height
+                                    if aspect_ratio > 1.5:
+                                        target_width, target_height = min(width, 1920), min(height, 1080)
+                                    elif aspect_ratio < 0.67:
+                                        target_width, target_height = min(width, 1080), min(height, 1920)
+                                    else:
+                                        target_width, target_height = min(width, 1080), min(height, 1080)
+                                    target_width = target_width + (target_width % 2)
+                                    target_height = target_height + (target_height % 2)
                                     ffmpeg_cmd = (
                                         f'ffmpeg -i "{temp_audio_file}" -c:v libx264 -b:v 3500k '
-                                        f'-vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" -r 30 '
+                                        f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                                         f'-t 140 "{video_output_path}"'
                                     )
                                     success, output = run_command(ffmpeg_cmd)
