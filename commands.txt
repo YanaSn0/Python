@@ -1,4 +1,7 @@
-Below is a simplified list of commands to use the script (s.py) for various tasks, formatted as plain text for easy copying into a text file. These commands assume you have the script and dependencies (ffmpeg, ffprobe, yt-dlp, gallery-dl) installed, and your videos or URLs are prepared.
+Below is a simplified list of commands to use the script (s.py) for various tasks, 
+formatted as plain text for easy copying into a text file. 
+These commands assume you have the script and dependencies (ffmpeg, ffprobe, yt-dlp, gallery-dl) installed, 
+and your videos or URLs are prepared.
 
 # 1. Convert existing videos to Universal format (batch_convert mode)
 python s.py batch_convert ./videos --output-dir ./converted
@@ -43,9 +46,11 @@ If the output path doesn't exist one will be created in the same folder as the s
 
 Dependencies: Ensure ffmpeg, ffprobe, yt-dlp, and gallery-dl are installed and accessible in your system's PATH.
 
-urls.txt: For download mode, you need a urls.txt file in the same directory as the script with URLs (one per line or separated by semicolons).
+urls.txt: For download mode, you need a urls.txt file in the same directory as the script with URLs 
+(one per line or separated by semicolons).
 
 Testing: Start with a small set of files or URLs to verify the commands work as expected before processing large batches.
 
-You can copy the above text into a file (e.g., commands.txt) and reference it when running the script. If you need further clarification or run into issues, let me know!
+You can copy the above text into a file (e.g., commands.txt) and reference it when running the script. 
+If you need further clarification or run into issues, let me know!
 
