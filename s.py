@@ -237,6 +237,8 @@ def main():
     if mode == "batch_convert":
         input_dir = os.path.abspath(args.input_dir)
         output_dir = os.path.abspath(args.output_dir if args.output_dir else input_dir)
+        print(f"DEBUG: Input directory: {input_dir}")
+        print(f"DEBUG: Output directory: {output_dir}")
 
         if not os.path.exists(input_dir):
             print(f"Error: Input directory {input_dir} does not exist.")
@@ -246,17 +248,19 @@ def main():
             os.makedirs(output_dir)
             print(f"Created output directory: {output_dir}")
 
-        video_files = glob.glob(os.path.join(input_dir, "*.mp4"))
+        video_files = glob.glob(os.path.join(input_dir, "*.mp4")) + glob.glob(os.path.join(input_dir, "*.mkv"))
+        print(f"DEBUG: Found video files: {video_files}")
         if not video_files:
-            print(f"Error: No .mp4 files found in {input_dir}.")
+            print(f"Error: No .mp4 or .mkv files found in {input_dir}.")
             sys.exit(1)
 
         print(f"Found {len(video_files)} video files to convert.")
 
         current_u_number = 1
         for video_file in video_files:
-            print(f"\nConverting {video_file} to Universal format...")
+            print(f"\nDEBUG: Processing {video_file}")
             width, height = get_video_dimensions(video_file)
+            print(f"DEBUG: Video dimensions: {width}x{height}")
             width = width + (width % 2)
             height = height + (height % 2)
             aspect_ratio = width / height
@@ -268,17 +272,20 @@ def main():
                 target_width, target_height = min(width, 1080), min(height, 1080)
             target_width = target_width + (target_width % 2)
             target_height = target_height + (target_height % 2)
+            print(f"DEBUG: Target dimensions: {target_width}x{target_height}")
 
             output_name_with_ext, output_name_base, current_u_number = get_next_available_name(
                 output_dir, "U", ".mp4", start_num=current_u_number
             )
             output_path = os.path.join(output_dir, output_name_with_ext)
+            print(f"DEBUG: Output path: {output_path}")
 
             ffmpeg_cmd = (
                 f'ffmpeg -i "{video_file}" -c:v libx264 -b:v 3500k '
                 f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                 f'-c:a aac -b:a 128k -ar 44100 -t 140 "{output_path}"'
             )
+            print(f"DEBUG: Running FFmpeg command: {ffmpeg_cmd}")
             success, output = run_command(ffmpeg_cmd)
             if success:
                 print(f"Saved Universal as {output_path}")
