@@ -226,6 +226,17 @@ def main():
     parser_loop.add_argument("--output-dir", "-o",
                              help="Directory where output will be saved (default: same as audio file directory)")
 
+    # New mode: trim_loop_from_video
+    parser_trim_loop = subparsers.add_parser("trim_loop_from_video", help="Trim audio from a video and loop it to a specified duration")
+    parser_trim_loop.add_argument("video_path", help="Path to the video file (e.g., ./videos/U1 for U1.mp4)")
+    parser_trim_loop.add_argument("loop_duration", type=float, help="Desired duration of the final looped audio in seconds (e.g., 60)")
+    parser_trim_loop.add_argument("--start", type=float, default=0, help="Start time in seconds (default: 0)")
+    parser_trim_loop.add_argument("--trim-duration", type=float, help="Duration to trim in seconds (optional)")
+    parser_trim_loop.add_argument("--end", type=float, help="End time in seconds (alternative to --trim-duration)")
+    parser_trim_loop.add_argument("--last", type=float, help="Extract the last X seconds of the audio (e.g., --last 30)")
+    parser_trim_loop.add_argument("--output-dir", "-o",
+                                  help="Directory where output will be saved (default: same as video file directory)")
+
     parser_batch_convert = subparsers.add_parser("batch_convert", help="Convert existing videos to Universal format")
     parser_batch_convert.add_argument("input_dir", help="Directory containing input video files (e.g., ./videos)")
     parser_batch_convert.add_argument("--output-dir", "-o", default=".",
@@ -237,8 +248,6 @@ def main():
     if mode == "batch_convert":
         input_dir = os.path.abspath(args.input_dir)
         output_dir = os.path.abspath(args.output_dir if args.output_dir else input_dir)
-        print(f"DEBUG: Input directory: {input_dir}")
-        print(f"DEBUG: Output directory: {output_dir}")
 
         if not os.path.exists(input_dir):
             print(f"Error: Input directory {input_dir} does not exist.")
@@ -249,7 +258,6 @@ def main():
             print(f"Created output directory: {output_dir}")
 
         video_files = glob.glob(os.path.join(input_dir, "*.mp4")) + glob.glob(os.path.join(input_dir, "*.mkv"))
-        print(f"DEBUG: Found video files: {video_files}")
         if not video_files:
             print(f"Error: No .mp4 or .mkv files found in {input_dir}.")
             sys.exit(1)
@@ -258,9 +266,8 @@ def main():
 
         current_u_number = 1
         for video_file in video_files:
-            print(f"\nDEBUG: Processing {video_file}")
+            print(f"\nConverting {video_file} to Universal format...")
             width, height = get_video_dimensions(video_file)
-            print(f"DEBUG: Video dimensions: {width}x{height}")
             width = width + (width % 2)
             height = height + (height % 2)
             aspect_ratio = width / height
@@ -272,20 +279,17 @@ def main():
                 target_width, target_height = min(width, 1080), min(height, 1080)
             target_width = target_width + (target_width % 2)
             target_height = target_height + (target_height % 2)
-            print(f"DEBUG: Target dimensions: {target_width}x{target_height}")
 
             output_name_with_ext, output_name_base, current_u_number = get_next_available_name(
                 output_dir, "U", ".mp4", start_num=current_u_number
             )
             output_path = os.path.join(output_dir, output_name_with_ext)
-            print(f"DEBUG: Output path: {output_path}")
 
             ffmpeg_cmd = (
                 f'ffmpeg -i "{video_file}" -c:v libx264 -b:v 3500k '
                 f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" -r 30 '
                 f'-c:a aac -b:a 128k -ar 44100 -t 140 "{output_path}"'
             )
-            print(f"DEBUG: Running FFmpeg command: {ffmpeg_cmd}")
             success, output = run_command(ffmpeg_cmd)
             if success:
                 print(f"Saved Universal as {output_path}")
@@ -474,7 +478,7 @@ def main():
         ffmpeg_video_cmd = (
             f'ffmpeg -i "{actual_input_path}" -c:v copy -an "{video_output}.mp4"'
         )
-        success, output = run_command(ffmpeg_cmd)
+        success, output = run_command(ffmpeg_video_cmd)
         if not success:
             print(f"Failed to extract video.")
             sys.exit(1)
@@ -483,7 +487,7 @@ def main():
             ffmpeg_audio_cmd = (
                 f'ffmpeg -i "{actual_input_path}" -vn -c:a copy "{audio_output}.m4a"'
             )
-            success, output = run_command(ffmpeg_cmd)
+            success, output = run_command(ffmpeg_audio_cmd)
             if not success:
                 print(f"Failed to extract audio.")
                 if os.path.exists(f"{video_output}.mp4"):
@@ -493,6 +497,100 @@ def main():
             print("No audio stream found in the input file.")
 
         print(f"Done! Output(s) saved in {output_dir}")
+        return
+
+    if mode == "trim_loop_from_video":
+        video_path = args.video_path + ".mp4"
+        loop_duration = args.loop_duration
+        output_dir = args.output_dir if args.output_dir else os.path.dirname(video_path)
+        start_time = args.start
+        trim_duration = args.trim_duration
+        end_time = args.end
+        last_duration = args.last
+
+        actual_video_path = find_video_file(args.video_path)
+        if not actual_video_path:
+            dir_name = os.path.abspath(os.path.dirname(video_path) or ".")
+            base_name = os.path.basename(video_path)
+            tried_paths = [os.path.join(dir_name, f"{base_name}{ext}") for ext in ['.mp4', '.MP4']]
+            print(f"Error: Video file {video_path} not found. Tried: {', '.join(tried_paths)}")
+            sys.exit(1)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            print(f"Created output directory: {output_dir}")
+
+        # Check if the video has an audio stream
+        if not has_audio_stream(actual_video_path):
+            print(f"Error: No audio stream found in the video file {actual_video_path}.")
+            sys.exit(1)
+
+        # Get the total duration of the video (and its audio)
+        video_duration = get_file_duration(actual_video_path)
+        if video_duration == 0:
+            print("Error: Could not determine video duration. Cannot proceed.")
+            sys.exit(1)
+
+        # Handle --last flag
+        if last_duration is not None:
+            if last_duration <= 0 or last_duration > video_duration:
+                print(f"Error: Last duration ({last_duration}) must be positive and less than video duration ({video_duration}).")
+                sys.exit(1)
+            start_time = video_duration - last_duration
+            trim_duration = last_duration
+        else:
+            # Determine the trim duration
+            if end_time is not None and trim_duration is None:
+                if end_time <= start_time or end_time > video_duration:
+                    print(f"Error: End time ({end_time}) must be greater than start time ({start_time}) and less than video duration ({video_duration}).")
+                    sys.exit(1)
+                trim_duration = end_time - start_time
+            elif trim_duration is None:
+                # Default to the remaining duration from start_time
+                trim_duration = video_duration - start_time
+                if trim_duration <= 0:
+                    print(f"Error: Start time ({start_time}) must be less than video duration ({video_duration}).")
+                    sys.exit(1)
+            else:
+                if start_time + trim_duration > video_duration:
+                    print(f"Error: Start time ({start_time}) + trim duration ({trim_duration}) exceeds video duration ({video_duration}).")
+                    sys.exit(1)
+
+        # Calculate looping based on the trimmed duration
+        loop = int(loop_duration / trim_duration) + 1 if trim_duration < loop_duration else 0
+        print(f"Trimmed audio duration: {trim_duration} seconds, looping {loop} times to reach at least {loop_duration} seconds.")
+
+        output_name_with_ext, output_name_base = get_next_available_name(output_dir, "L", ".m4a")[:2]
+        output_name = os.path.join(output_dir, output_name_base)
+        print(f"Extracting and looping audio to {loop_duration} seconds...")
+        print(f"Output will be saved as {output_name_with_ext}")
+
+        # Extract and trim the audio directly from the video
+        temp_audio_path = os.path.join(output_dir, "temp_extracted.m4a")
+        ffmpeg_extract_trim_cmd = (
+            f'ffmpeg -i "{actual_video_path}" -vn -ss {start_time} -t {trim_duration} -c:a copy "{temp_audio_path}"'
+        )
+        success, output = run_command(ffmpeg_extract_trim_cmd)
+        if not success:
+            print(f"Failed to extract and trim audio from video. FFmpeg output: {output}")
+            sys.exit(1)
+
+        # Loop the trimmed audio
+        ffmpeg_cmd = (
+            f'ffmpeg -stream_loop {loop} -i "{temp_audio_path}" -c:a copy -t {loop_duration} "{output_name}.m4a"'
+        )
+        success, output = run_command(ffmpeg_cmd)
+        if not success:
+            print(f"Failed to loop audio. FFmpeg output: {output}")
+            if os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+            sys.exit(1)
+
+        # Clean up the temporary file
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+
+        print(f"Done! Output saved in {output_dir}")
         return
 
     # Download mode (audio, video, combined, split, pic, all, all+a, all+a+v, all+v)
