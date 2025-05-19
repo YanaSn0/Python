@@ -1,5 +1,13 @@
 # Media Processing Script (s.py)
 
+## Requirements
+
+- **Python 3.x**: Install from [python.org](https://www.python.org/downloads/)
+- **FFmpeg**: Install from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
+- **Optional (for download mode)**:
+  - `yt-dlp`: `pip install yt-dlp`
+  - `gallery-dl`: `pip install gallery-dl`
+
 ## Commands
 
 ### Split a video into audio and video files
@@ -44,12 +52,3 @@ python s.py batch_convert videos --output-dir ./output
 ### Download media from URLs (urls.txt required)
 
 python s.py download audio --output-dir ./output
-
-
-## Requirements
-
-- **Python 3.x**: Install from [python.org](https://www.python.org/downloads/)
-- **FFmpeg**: Install from [ffmpeg.org](https://ffmpeg.org/download.html) and add to PATH
-- **Optional (for download mode)**:
-  - `yt-dlp`: `pip install yt-dlp`
-  - `gallery-dl`: `pip install gallery-dl`
