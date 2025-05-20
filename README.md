@@ -56,3 +56,7 @@ python s.py download all --output-dir ./output
 python s.py download audio --output-dir ./output
 
 python s.py download video --output-dir ./output
+
+python s.py download full --output-dir ./output
+
+
