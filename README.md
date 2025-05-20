@@ -51,4 +51,8 @@ python s.py batch_convert videos --output-dir ./output
 
 ### Download media from URLs (urls.txt required)
 
+python s.py download all --output-dir ./output
+
 python s.py download audio --output-dir ./output
+
+python s.py download video --output-dir ./output
