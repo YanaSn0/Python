@@ -25,7 +25,7 @@ python s.py trim_loop U1 --start 30 --end 45 --duration 60 --output-dir ./output
 ### Combine a video and audio file
 python s.py combine V1 A1 --output-dir ./output
 
-### Create a slideshow from images (5-second delay per image)
+### Create a slideshow from images, 3-second interval, 20 picture, folders named slide_in and slide_out in same folder as the script.
 python s.py slide 3 slide_in/P1 slide_in/P2 slide_in/P3 slide_in/P4 slide_in/P5 slide_in/P6 slide_in/P7 slide_in/P8 slide_in/P9 slide_in/P10 slide_in/P11 slide_in/P12 slide_in/P13 slide_in/P14 slide_in/P15 slide_in/P16 slide_in/P17 slide_in/P18 slide_in/P19 slide_in/P20 --output-dir slide_out
 
 ### Batch convert videos to universal format
