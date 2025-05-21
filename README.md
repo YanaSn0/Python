@@ -33,17 +33,31 @@ python s.py batch_convert videos --output-dir ./output
 
 ### Download media from URLs (urls.txt required)
 python s.py download all --output-dir ./output
+
 python s.py download all+a --output-dir ./output
+
 python s.py download all+a+v --output-dir ./output
+
 python s.py download all+v --output-dir ./output
+
 python s.py download audio --output-dir ./output
+
 python s.py download video --output-dir ./output
+
 python s.py download combined --output-dir ./output
+
 python s.py download split --output-dir ./output
+
 python s.py download pic --output-dir ./output
+
 python s.py download full --output-dir ./output
+
 python s.py download all --output-dir ./output --keep-original
+
 python s.py download all --output-dir ./output --clear-dir
+
 python s.py download all --output-dir ./output --username myuser --password mypass
+
 python s.py download all --output-dir ./output --cookies cookies.txt
+
 python s.py download all --output-dir ./output --duration 60
