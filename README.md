@@ -1,6 +1,6 @@
 ## Media Scripts README
 
-## Media Scripts Commands
+## Media Scripts Commands download.py and process.py
 
 ## download.py
 
