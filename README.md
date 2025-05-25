@@ -126,6 +126,9 @@ python process.py convert ./reels --output-dir ./converted --debug
 
 ## Create Slideshow
 
+##Create a slideshow from all images in a directory:
+
+
 Creates a slideshow video from images with specified delay.
 
 python process.py slide 3 ./images/image1.jpg ./images/image2.jpg --output-dir ./slideshows --debug  
