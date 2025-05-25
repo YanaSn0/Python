@@ -1,4 +1,14 @@
-## Media Script Commands for download.py and process.py
+# Media Processing Scripts (download.py and process.py)
+
+## Requirements
+
+- Python 3.x: Install from https://www.python.org/downloads/
+- FFmpeg: Install from https://ffmpeg.org/download.html and add to PATH
+- Optional (for download mode):
+  - yt-dlp: pip install yt-dlp
+  - gallery-dl: pip install gallery-dl
+
+## Commands
 
 ## download.py
 
