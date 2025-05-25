@@ -1,4 +1,4 @@
-## Media Scripts Commands for download.py and process.py
+## Media Script Commands for download.py and process.py
 
 ## download.py
 
