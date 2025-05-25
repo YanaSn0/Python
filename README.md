@@ -1,5 +1,5 @@
-Download + Process
-Project Banner: https://via.placeholder.com/1200x300.png?text=Download+%26+Process
+## Download + Process
+
 This repository contains two Python scripts, download.py and process.py, designed to streamline the process of downloading and processing media files (videos, audio, images) for creating content, such as for social media platforms like YouTube and Facebook.
 download.py: Downloads media from URLs listed in a urls.txt file, supporting videos, audio, images, or a combination.
 
