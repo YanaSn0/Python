@@ -2,6 +2,20 @@
 
 ## download.py
 
+## Download All Possible Media Types
+
+## Tries combined video/audio, audio-only, video-only, then images.
+
+python download.py all --output-dir ./all --debug  
+
+## Download with Authentication (Un tested. Only used to fetch recent post and post title)
+
+## Uses username/password or cookies for private content. (repeat logins can flag account easier)
+
+python download.py audio --output-dir ./audio --username your_username --password your_password --debug  
+
+python download.py audio --output-dir ./audio --cookies cookies.txt --debug 
+
 ## Download Audio Only
 
 ## Saves audio as .m4a files.
@@ -30,21 +44,7 @@ python download.py combined --output-dir ./combined --debug
 
 ## Saves separate video (.mp4) and audio (.m4a) files.
 
-python download.py split --output-dir ./split --debug  
-
-## Download All Possible Media Types
-
-## Tries combined video/audio, audio-only, video-only, then images.
-
-python download.py all --output-dir ./all --debug  
-
-## Download with Authentication
-
-## Uses username/password or cookies for private content.
-
-python download.py audio --output-dir ./audio --username your_username --password your_password --debug  
-
-python download.py audio --output-dir ./audio --cookies cookies.txt --debug  
+python download.py split --output-dir ./split --debug   
 
 ## Download with Duration Limit
 
