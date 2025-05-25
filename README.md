@@ -2,7 +2,9 @@
 
 This repository contains two Python scripts, download.py and process.py, designed to streamline the process of downloading and processing media files (videos, audio, images) for creating content, such as for social media platforms like YouTube and Facebook.
 
-download.py: Downloads media from URLs listed in a urls.txt file, supporting videos, audio, images, or a combination.
+## download.py: 
+
+Downloads media from URLs listed in a urls.txt file, supporting videos, audio, images, or a combination.
 
 process.py: Processes downloaded media with operations like trimming, looping, splitting, combining, converting, creating slideshows, and concatenating videos with effects.
 
