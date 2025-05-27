@@ -141,7 +141,7 @@ python process.py slide 3 ./images/*.jpg --output-dir ./output
 
 ## Creates a slideshow from images:
 
-python process.py slide 3 ./images/P1.jpg ./images/P2.jpg --output-dir ./slideshows --debug  
+python process.py slide 3 ./slide_in/P1.jpg ./slide_in/P2.jpg --output-dir ./slide_out --debug  
 
 ## Convert Videos to Universal Format:
 
