@@ -129,19 +129,23 @@ python process.py split ./videos/O11.mp4 --output-dir ./split --debug
 
 python process.py combine ./videos/V1.mp4 ./audio/A1.m4a --output-dir ./combined --debug    
 
-## Create Slideshow Video from Pictures with specified delay:
+## Slideshow Video from Pictures with specified delay:
 
-## Create a slideshow from all images in a directory:
+## Slideshow from all images in a directory:
 
 python process.py slide 3 ./images/ --output-dir ./output
 
-## Create a slideshow from a wildcard pattern:
+## Slideshow from a wildcard pattern:
 
 python process.py slide 3 ./images/*.jpg --output-dir ./output
 
-## Creates a slideshow from images:
+## Slideshow from an image:
 
-python process.py slide 3 ./slide_in/P1.jpg ./slide_in/P2.jpg --output-dir ./slide_out --debug  
+python process.py slide 5 ./slide_in P1 --output-dir ./slide_out --debug
+
+## Slideshow from images:
+
+python process.py slide 5 ./slide_in P1 P2 --output-dir ./slide_out --debug
 
 ## Convert Videos to Universal Format:
 
