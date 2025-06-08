@@ -125,9 +125,9 @@ python process.py split ./videos/O11.mp4 --output-dir ./split --debug
 
 ## Combine Video and Audio
 
-## Combines video and audio files into a single .mp4:
+## Combines video and audio files into a single:
 
-python process.py combine ./videos/V1.mp4 ./audio/A1.m4a --output-dir ./combined --debug    
+python process.py combine ./looped --output-dir ./combined --debug
 
 ## Slideshow Video from Pictures with specified delay:
 
