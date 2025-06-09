@@ -348,7 +348,7 @@ def extract_image_features(image_path, target_size=(224, 224)):
 
 def main():
     global DEBUG
-    parser = argparse.ArgumentParser(description="Process media files: trim, loop, split, combine, convert, create slideshows, concatenate, group, or copyrename")
+    parser = argparse.ArgumentParser(description="Process media files: trim, loop, loopaudio, split, combine, convert, create slideshows, concatenate, group, or copyrename")
     subparsers = parser.add_subparsers(dest="submode", help="Submode: 'trim', 'loop', 'loopaudio', 'split', 'combine', 'convert', 'slide', 'concat', 'group', 'copyrename'")
     subparsers.required = True
 
@@ -357,16 +357,16 @@ def main():
     trim_subparsers = parser_trim.add_subparsers(dest="output_type", help="Output type: 'a' for audio (.m4a), 'v' for video (.mp4)")
     trim_subparsers.required = True
     parser_trim_audio = trim_subparsers.add_parser("a", help="Output as audio (.m4a)")
-    parser_trim_audio.add_argument("video_path", help="Path to the video file (e.g., ./videos/U1 for U1.mp4)")
+    parser_trim_audio.add_argument("input_path", help="Path to the audio or video file (e.g., ./videos/U1 for U1.mp4 or ./audio/A1 for A1.m4a)")
     parser_trim_audio.add_argument("--start", type=float, default=0, help="Start time in seconds (default: 0)")
     parser_trim_audio.add_argument("--end", type=float, required=True, help="End time in seconds")
-    parser_trim_audio.add_argument("--output-dir", "-o", help="Directory where output will be saved (default: same as video file directory)")
+    parser_trim_audio.add_argument("--output-dir", "-o", help="Directory where output will be saved (default: same as input file directory)")
     parser_trim_audio.add_argument("--username")
     parser_trim_audio.add_argument("--password")
     parser_trim_audio.add_argument("--cookies")
     parser_trim_audio.add_argument("--debug", action="store_true", help="Enable debug output")
     parser_trim_video = trim_subparsers.add_parser("v", help="Output as video (.mp4)")
-    parser_trim_video.add_argument("video_path", help="Path to the video file (e.g., ./videos/U1 for U1.mp4)")
+    parser_trim_video.add_argument("input_path", help="Path to the video file (e.g., ./videos/U1 for U1.mp4)")
     parser_trim_video.add_argument("--start", type=float, default=0, help="Start time in seconds (default: 0)")
     parser_trim_video.add_argument("--end", type=float, required=True, help="End time in seconds")
     parser_trim_video.add_argument("--output-dir", "-o", help="Directory where output will be saved (default: same as video file directory)")
@@ -494,32 +494,41 @@ def main():
     try:
         if submode in ["trim", "loop"]:
             output_type = args.output_type
-            video_path = args.video_path
+            # MODIFIED START: Use input_path instead of video_path and handle audio/video
+            input_path = args.input_path if submode == "trim" else args.video_path
             start_time = args.start
             end_time = args.end
             desired_duration = getattr(args, "duration", None)
-            output_dir = args.output_dir if args.output_dir else os.path.dirname(os.path.abspath(video_path)) or "."
-            actual_video_path = find_video_file(video_path)
-            if not actual_video_path or not os.path.exists(actual_video_path):
-                print(f"Error: Video file not found: {video_path}")
+            output_dir = args.output_dir if args.output_dir else os.path.dirname(os.path.abspath(input_path)) or "."
+            # Determine if input is audio or video based on output_type for trim submode
+            if submode == "trim":
+                if output_type == "a":
+                    actual_input_path = find_audio_file(input_path)
+                else:
+                    actual_input_path = find_video_file(input_path)
+            else:
+                actual_input_path = find_video_file(input_path)
+            # MODIFIED END
+            if not actual_input_path or not os.path.exists(actual_input_path):
+                print(f"Error: {'Audio' if output_type == 'a' and submode == 'trim' else 'Video'} file not found: {input_path}")
                 sys.exit(1)
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-            video_duration = get_file_duration(actual_video_path)
-            if video_duration == 0:
-                print(f"Error: Could not determine duration of {actual_video_path}")
+            file_duration = get_file_duration(actual_input_path)
+            if file_duration == 0:
+                print(f"Error: Could not determine duration of {actual_input_path}")
                 sys.exit(1)
-            if start_time < 0 or start_time >= video_duration:
-                print(f"Error: Start time {start_time} is out of bounds (video duration: {video_duration} seconds)")
+            if start_time < 0 or start_time >= file_duration:
+                print(f"Error: Start time {start_time} is out of bounds (file duration: {file_duration} seconds)")
                 sys.exit(1)
-            if end_time <= start_time or end_time > video_duration:
-                print(f"Error: End time {end_time} is out of bounds (start: {start_time}, video duration: {video_duration} seconds)")
+            if end_time <= start_time or end_time > file_duration:
+                print(f"Error: End time {end_time} is out of bounds (start: {start_time}, file duration: {file_duration} seconds)")
                 sys.exit(1)
             trim_duration = end_time - start_time
-            video_title = os.path.splitext(os.path.basename(actual_video_path))[0]
-            title = get_video_title(actual_video_path, auth)
+            file_title = os.path.splitext(os.path.basename(actual_input_path))[0]
+            title = get_video_title(actual_input_path, auth) if submode == "trim" and output_type == "v" else None
             if title:
-                video_title = title
+                file_title = title
             if output_type == "a":
                 prefix = "A" if submode == "trim" else "AL"
                 extension = ".m4a"
@@ -534,17 +543,17 @@ def main():
             try:
                 if output_type == "v":
                     ffmpeg_cmd = (
-                        f'ffmpeg -y -i "{actual_video_path}" -ss {start_time} -t {trim_duration} '
+                        f'ffmpeg -y -i "{actual_input_path}" -ss {start_time} -t {trim_duration} '
                         f'-c:v copy -c:a aac -b:a 128k "{temp_trimmed_path}{extension}"'
                     )
                 else:
                     ffmpeg_cmd = (
-                        f'ffmpeg -y -i "{actual_video_path}" -vn -ss {start_time} -t {trim_duration} '
+                        f'ffmpeg -y -i "{actual_input_path}" -vn -ss {start_time} -t {trim_duration} '
                         f'-c:a aac -b:a 128k "{temp_trimmed_path}{extension}"'
                     )
                 success, output = run_command(ffmpeg_cmd)
                 if not success or not os.path.exists(f"{temp_trimmed_path}{extension}"):
-                    print(f"Failed to trim {actual_video_path}")
+                    print(f"Failed to trim {actual_input_path}")
                     sys.exit(1)
                 if submode == "trim":
                     os.rename(f"{temp_trimmed_path}{extension}", output_path)
@@ -575,7 +584,7 @@ def main():
                             if success:
                                 print(f"Saved Looped {'Audio' if output_type == 'a' else 'Video'} as {output_path.replace(os.sep, '/')}")
                             else:
-                                print(f"Failed to loop {actual_video_path}")
+                                print(f"Failed to loop {actual_input_path}")
                                 sys.exit(1)
                             if os.path.exists(f"{temp_trimmed_path}{extension}"):
                                 os.remove(f"{temp_trimmed_path}{extension}")
@@ -768,14 +777,12 @@ def main():
                 max_duration = 140
                 final_duration = video_duration if video_duration > 0 else max_duration
 
-                # MODIFIED START: Added -map options to ensure correct video and audio streams
                 ffmpeg_cmd = (
                     f'ffmpeg -y -i "{actual_video_path}" -stream_loop {loop_count - 1} -i "{actual_audio_path}" '
                     f'-map 0:v:0 -map 1:a:0 '
                     f'-c:v libx264 -preset ultrafast -b:v 3500k -r 30 -pix_fmt yuv420p '
                     f'-c:a aac -b:a 128k -ar 44100 -shortest -t {final_duration} "{output_path}"'
                 )
-                # MODIFIED END
 
                 success, output = run_command(ffmpeg_cmd)
                 if success:
