@@ -33,7 +33,7 @@ python download.py audio --output-dir ./audio --cookies cookies.txt --debug
 
 ## Saves audio as .m4a files.
 
-python download.py audio --output-dir ./audio --debug  
+python download.py audio --debug
 
 ## Download Video Only
 
