@@ -91,9 +91,11 @@ python download.py audio --output-dir ./audio --clear-dir --debug
 
 ## Trims a video to specified start and end times, outputs as .mp4.
 
-python process.py trim v ./videos/U1.mp4 --start 10 --end 20 --output-dir ./trimmed --debug  
+python process.py trim v ./videos/V1.mp4 --start 22 --end 27 --output-dir ./trimmed --debug
 
-## Trim Audio
+## Trims Audio to specified start and end times, outputs as .mpa.
+
+python process.py trim a ./videos/A1.m4a --start 22 --end 27 --output-dir ./trimmed --debug
 
 ## Extracts and trims audio from a video, outputs as .m4a.
 
