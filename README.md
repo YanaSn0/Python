@@ -135,7 +135,11 @@ python process.py combine ./looped --output-dir ./combined --debug
 
 ## Slideshow from all images in a directory:
 
-python process.py slide 3 ./images/ --output-dir ./output
+python process.py slide 5 ./slide_in --output-dir ./slide_out
+
+## Slideshow from a double extension image file.
+
+python process.py slide 5 ./slide_in image.psd.png --output-dir ./slide_out
 
 ## Slideshow from a wildcard pattern:
 
