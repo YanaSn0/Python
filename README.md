@@ -123,7 +123,7 @@ python process.py loopaudio ./audio/A1.m4a 60 --output-dir ./looped --debug
 
 ## Splits a video into video (.mp4) and audio (.m4a) files.
 
-python process.py split ./videos/O11.mp4 --output-dir ./split --debug  
+python process.py split ./downloaded/YanaSn0w1_Video --debug
 
 ## Combine Video and Audio
 
