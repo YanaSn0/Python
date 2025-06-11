@@ -221,10 +221,21 @@ def find_image_file(image_path):
     extensions = ['.jpg', '.jpeg', '.png', '.webp']
     image_path = os.path.abspath(image_path)
     debug_print(f"Debug: Processing image path: {image_path}")
-    ext = os.path.splitext(image_path)[1].lower()
-    if ext in extensions and os.path.exists(image_path):
-        debug_print(f"Debug: Found image file directly: {image_path}")
-        return image_path
+    # Get the last extension after splitting by '.'
+    base_name = os.path.basename(image_path)
+    parts = base_name.split('.')
+    if len(parts) > 1:
+        last_ext = '.' + parts[-1].lower()
+        if last_ext in extensions and os.path.exists(image_path):
+            debug_print(f"Debug: Found image file directly with last extension: {image_path}")
+            return image_path
+        # Handle multiple extensions (e.g., image.psd.png)
+        if len(parts) > 2:
+            adjusted_name = '.'.join(parts[:-1] + [parts[-1]])
+            adjusted_path = os.path.join(os.path.dirname(image_path), adjusted_name)
+            if os.path.exists(adjusted_path):
+                debug_print(f"Debug: Adjusted path to handle multiple extensions: {adjusted_path}")
+                return adjusted_path
     dir_name = os.path.dirname(image_path) if os.path.dirname(image_path) else os.path.abspath(".")
     base_name = os.path.splitext(os.path.basename(image_path))[0].lower()
     debug_print(f"Debug: Searching for image with base name '{base_name}' in directory '{dir_name}'")
@@ -327,25 +338,6 @@ def parse_image_names(image_names, folder_path):
             return image_names
     return image_names
 
-def extract_image_features(image_path, target_size=(224, 224)):
-    """Extract features from an image using a pre-trained MobileNetV2 model."""
-    import tensorflow as tf
-    import numpy as np
-    from tensorflow.keras.applications import MobileNetV2
-    from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
-    from tensorflow.keras.preprocessing.image import img_to_array, load_img
-    try:
-        img = load_img(image_path, target_size=target_size)
-        img_array = img_to_array(img)
-        img_array = np.expand_dims(img_array, axis=0)
-        img_array = preprocess_input(img_array)
-        model = MobileNetV2(weights='imagenet', include_top=False, pooling='avg')
-        features = model.predict(img_array)
-        return features.flatten()
-    except Exception as e:
-        print(f"Error extracting features from {image_path}: {e}")
-        return None
-
 def main():
     global DEBUG
     parser = argparse.ArgumentParser(description="Process media files: trim, loop, loopaudio, split, combine, convert, create slideshows, concatenate, group, or copyrename")
@@ -441,7 +433,7 @@ def main():
     parser_slide = subparsers.add_parser("slide", help="Create a slideshow video from images in a folder")
     parser_slide.add_argument("delay", type=float, help="Delay in seconds for each image")
     parser_slide.add_argument("folder_path", help="Path to the folder containing image files (e.g., ./slide_in)")
-    parser_slide.add_argument("image_names", nargs='*', help="Names of image files without extensions, range (e.g., P0-P32), or wildcard (e.g., P*). If omitted, uses all images in folder.")
+    parser_slide.add_argument("image_names", nargs='*', help="Names of image files (e.g., image.psd.png) or range (e.g., P0-P32) or wildcard (e.g., P*). If omitted, uses all images in folder.")
     parser_slide.add_argument("--output-dir", "-o", help="Directory where output will be saved (default: folder path)")
     parser_slide.add_argument("--keep-original", action="store_true", help="Use original image resolutions and formats without resizing")
     parser_slide.add_argument("--username")
@@ -1104,6 +1096,26 @@ def main():
 
         elif submode == "group":
             from sklearn.cluster import KMeans
+            import tensorflow as tf
+            import numpy as np
+            from tensorflow.keras.applications import MobileNetV2
+            from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+            from tensorflow.keras.preprocessing.image import img_to_array, load_img
+
+            def extract_image_features(image_path, target_size=(224, 224)):
+                """Extract features from an image using a pre-trained MobileNetV2 model."""
+                try:
+                    img = load_img(image_path, target_size=target_size)
+                    img_array = img_to_array(img)
+                    img_array = np.expand_dims(img_array, axis=0)
+                    img_array = preprocess_input(img_array)
+                    model = MobileNetV2(weights='imagenet', include_top=False, pooling='avg')
+                    features = model.predict(img_array)
+                    return features.flatten()
+                except Exception as e:
+                    print(f"Error extracting features from {image_path}: {e}")
+                    return None
+
             try:
                 debug_print("Debug: Entering group submode")
                 folder_path = args.folder_path
