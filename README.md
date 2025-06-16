@@ -165,7 +165,7 @@ python process.py convert ./reels --output-dir ./converted --debug
 
 ## Concatenates all videos in a folder:
 
-python process.py concat ./concat_in --output-dir ./concat_out --debug  
+python process.py concat ./slide_out --output-dir ./concat_out --debug  
 
 ## Concatenates videos in a folder:
 
