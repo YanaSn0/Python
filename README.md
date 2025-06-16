@@ -19,7 +19,7 @@
 
 python download.py YanaSn0w1 full --debug --output-dir ./output
 
-## Download full with the video title as name.
+## With title as name.
 
 python download.py full --debug --output-dir ./output
 
