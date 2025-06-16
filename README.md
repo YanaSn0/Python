@@ -15,7 +15,7 @@
 
 ## download.py
 
-## Download full with custom name.
+## Download with custom name.
 
 python download.py YanaSn0w1 full --debug --output-dir ./output
 
