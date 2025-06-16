@@ -15,19 +15,9 @@
 
 ## download.py
 
-## Download All Possible Media Types
+## Download combined Video and audio with custom name and thumbnail. Using no name saves as video title.
 
-## Tries combined video/audio, audio-only, video-only, then images.
-
-python download.py all --output-dir ./all --debug  
-
-## Download with Authentication (Un tested. Only used to fetch recent post and post title)
-
-## Uses username/password or cookies for private content. (repeat logins can flag account easier)
-
-python download.py audio --output-dir ./audio --username your_username --password your_password --debug  
-
-python download.py audio --output-dir ./audio --cookies cookies.txt --debug 
+python download.py YanaSn0w1 full --debug --output-dir ./output
 
 ## Download Audio Only
 
