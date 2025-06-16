@@ -15,7 +15,7 @@
 
 ## download.py
 
-## Download combined Video and audio with custom name and thumbnail. Using no name saves as video title.
+## Download full with custom. Using no name saves as video title. Also gets thumbnail.
 
 python download.py YanaSn0w1 full --debug --output-dir ./output
 
@@ -29,19 +29,7 @@ python download.py audio --debug
 
 ## Saves video without audio as .mp4 files.
 
-python download.py video --output-dir ./videos --debug  
-
-## Download Images
-
-## Saves images as .jpg or other formats.
-
-python download.py pic --output-dir ./images --debug  
-
-## Download Combined Video and Audio
-
-## Saves videos with audio as .mp4 files.
-
-python download.py combined --output-dir ./combined --debug  
+python download.py video --output-dir ./videos --debug 
 
 ## Download and Split into Video and Audio
 
