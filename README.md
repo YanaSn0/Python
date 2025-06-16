@@ -15,7 +15,7 @@
 
 ## download.py
 
-## Download full with custom. Using no name saves as video title. Also gets thumbnail.
+## Download full with custom name. Using no name saves as the video title. Also gets thumbnail.
 
 python download.py YanaSn0w1 full --debug --output-dir ./output
 
