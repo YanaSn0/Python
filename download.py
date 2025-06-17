@@ -6,6 +6,8 @@ import re
 import urllib.parse
 import json
 import yt_dlp
+from contextlib import nullcontext
+import time
 
 # Global debug flag
 DEBUG = False
@@ -24,15 +26,19 @@ def run_command(command, suppress_errors=False):
         stdout=stdout,
         stderr=stderr,
         text=True,
+        errors='replace',  # Replace undecodable characters with �
         bufsize=1,
         universal_newlines=True
     )
     output = []
     try:
         if not suppress_errors and process.stdout:
-            for line in process.stdout:
-                debug_print(line, end='')
-                output.append(line)
+            with open("ffmpeg_log.txt", "a", encoding="utf-8", errors="replace") if DEBUG else nullcontext() as log_file:
+                for line in process.stdout:
+                    debug_print(line, end='')
+                    output.append(line)
+                    if log_file:
+                        log_file.write(line)
         return_code = process.wait()
         output_str = ''.join(output)
         if return_code != 0 and not suppress_errors:
@@ -43,6 +49,24 @@ def run_command(command, suppress_errors=False):
     finally:
         if process.stdout:
             process.stdout.close()
+        try:
+            process.terminate()
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+def safe_remove(file_path):
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return True
+        except PermissionError:
+            debug_print(f"Warning: PermissionError on attempt {attempt + 1} for {file_path}. Retrying...")
+            time.sleep(1)  # Wait before retrying
+    debug_print(f"Error: Failed to delete {file_path} after {max_attempts} attempts.")
+    return False
 
 def get_video_dimensions(video_path):
     cmd = f'ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json "{video_path}"'
@@ -68,6 +92,7 @@ def run_yt_dlp(params, output_path):
             'cookiesfrombrowser': ('firefox',),
             'writethumbnail': True,
             'postprocessors': params.get('postprocessors', []),
+            'clean_metadata': True,  # Strip problematic metadata
         }
         ydl_opts.update({k: v for k, v in params.items() if k not in ['postprocessors', 'writethumbnail']})
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -147,7 +172,7 @@ def convert_thumbnail_to_webp(input_path, output_path):
     ffmpeg_cmd = f'ffmpeg -i "{input_path}" -c:v libwebp "{output_path}"'
     success, ffmpeg_output = run_command(ffmpeg_cmd)
     if success:
-        os.remove(input_path)
+        safe_remove(input_path)
         return True
     print(f"Error: Failed to convert thumbnail: {ffmpeg_output}")
     return False
@@ -158,7 +183,7 @@ def trim_media(input_path, output_path, trim_limit, is_audio=False):
     ffmpeg_cmd = f'ffmpeg -i "{input_path}" {stream_spec} -t {trim_limit} -c:v copy -c:a {codec} "{output_path}"'
     success, ffmpeg_output = run_command(ffmpeg_cmd)
     if success:
-        os.remove(input_path)
+        safe_remove(input_path)
         return True
     print(f"Error: Failed to trim media: {ffmpeg_output}")
     return False
@@ -207,109 +232,115 @@ def main():
     current_number = 1
 
     for index, url in enumerate(unique_urls):
-        print(f"\nProcessing {'audio' if is_audio else 'video'} {index + 1}/{len(unique_urls)}: {url}")
+        try:
+            print(f"\nProcessing {'audio' if is_audio else 'video'} {index + 1}/{len(unique_urls)}: {url}")
 
-        for temp in [temp_media_file + ext for ext in [".m4a", ".opus", ".webm", ".mp3", ".mp4", ".mkv"]] + \
-                    [temp_media_thumbnail + ext for ext in [".webp", '.jpg', '.jpeg', '.png']]:
-            if os.path.exists(temp):
-                os.remove(temp)
+            for temp in [temp_media_file + ext for ext in [".m4a", ".opus", ".webm", ".mp3", ".mp4", ".mkv"]] + \
+                        [temp_media_thumbnail + ext for ext in [".webp", '.jpg', '.jpeg', '.png']]:
+                safe_remove(temp)
 
-        media_ext = ".m4a" if is_audio else ".mp4"
-        video_title = f"Untitled_{index + 1}"
-        title = get_video_title(url)
-        if title:
-            video_title = title
+            media_ext = ".m4a" if is_audio else ".mp4"
+            video_title = f"Untitled_{index + 1}"
+            title = get_video_title(url)
+            if title:
+                video_title = title
 
-        output_name_with_ext, thumbnail_name, current_number = get_next_available_name(
-            output_dir, media_ext, title=video_title, custom_name=custom_name,
-            start_num=current_number, use_url=use_url_naming, url=url
-        )
-        output_path = os.path.join(output_dir, output_name_with_ext)
-        thumbnail_path = os.path.join(output_dir, thumbnail_name)
-        duration_message = f"Duration: {trim_limit}s" if trim_limit else "Duration: Full"
+            output_name_with_ext, thumbnail_name, current_number = get_next_available_name(
+                output_dir, media_ext, title=video_title, custom_name=custom_name,
+                start_num=current_number, use_url=use_url_naming, url=url
+            )
+            output_path = os.path.join(output_dir, output_name_with_ext)
+            thumbnail_path = os.path.join(output_dir, thumbnail_name)
+            duration_message = f"Duration: {trim_limit}s" if trim_limit else "Duration: Full"
 
-        ydl_params = {
-            'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
-            'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'}] if is_audio else [],
-            'url': url,
-        }
+            ydl_params = {
+                'format': 'bestaudio/best' if is_audio else 'bestvideo+bestaudio/best',
+                'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'm4a'}] if is_audio else [],
+                'url': url,
+            }
 
-        success, yt_dlp_output = run_yt_dlp(ydl_params, temp_media_file)
-        if not success:
-            print(f"Error: Failed to download {'audio' if is_audio else 'video'}: {url}")
-            downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
-            if downloaded_thumbnail:
-                if not downloaded_thumbnail.endswith('.webp'):
-                    convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
-                    downloaded_thumbnail = temp_media_thumbnail + ".webp"
-                os.rename(downloaded_thumbnail, thumbnail_path)
-                print(f"Saved Thumbnail as: {thumbnail_path}")
-            continue
-
-        downloaded_media_file = find_downloaded_media_file(temp_media_file, is_audio)
-        if not downloaded_media_file:
-            print(f"Error: No {'audio' if is_audio else 'video'} file found for {url}")
-            downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
-            if downloaded_thumbnail:
-                if not downloaded_thumbnail.endswith('.webp'):
-                    convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
-                    downloaded_thumbnail = temp_media_thumbnail + ".webp"
-                os.rename(downloaded_thumbnail, thumbnail_path)
-                print(f"Saved Thumbnail as: {thumbnail_path}")
-            continue
-
-        downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
-        if downloaded_thumbnail and not downloaded_thumbnail.endswith('.webp'):
-            convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
-            downloaded_thumbnail = temp_media_thumbnail + ".webp"
-
-        if trim_limit:
-            temp_trimmed_media = os.path.join(output_dir, f"temp_media_trimmed{media_ext}")
-            if trim_media(downloaded_media_file, temp_trimmed_media, trim_limit, is_audio):
-                downloaded_media_file = temp_trimmed_media
-            else:
-                os.remove(downloaded_media_file)
+            success, yt_dlp_output = run_yt_dlp(ydl_params, temp_media_file)
+            if not success:
+                print(f"Error: Failed to download {'audio' if is_audio else 'video'}: {url}")
+                downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
                 if downloaded_thumbnail:
+                    if not downloaded_thumbnail.endswith('.webp'):
+                        convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
+                        downloaded_thumbnail = temp_media_thumbnail + ".webp"
                     os.rename(downloaded_thumbnail, thumbnail_path)
                     print(f"Saved Thumbnail as: {thumbnail_path}")
                 continue
 
-        if is_audio:
-            ffmpeg_cmd = f'ffmpeg -i "{downloaded_media_file}" -c:a aac -b:a 128k -ar 44100 "{output_path}"'
-        else:
-            width, height = get_video_dimensions(downloaded_media_file)
-            width = width + (width % 2)
-            height = height + (height % 2)
-            aspect_ratio = width / height if height > 0 else 1
-            if aspect_ratio > 1.5:
-                target_width, target_height = 1920, 1080
-            elif aspect_ratio < 0.67:
-                target_width, target_height = 1080, 1920
-            else:
-                target_width, target_height = 1080, 1080
-            target_width = target_width + (target_width % 2)
-            target_height = target_height + (target_height % 2)
-            ffmpeg_cmd = (
-                f'ffmpeg -i "{downloaded_media_file}" -c:v libx264 -preset fast -b:v 3500k -r 30 '
-                f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" '
-                f'-c:a aac -b:a 128k -ar 44100 -pix_fmt yuv420p -t 140 "{output_path}"'
-            )
+            downloaded_media_file = find_downloaded_media_file(temp_media_file, is_audio)
+            if not downloaded_media_file:
+                print(f"Error: No {'audio' if is_audio else 'video'} file found for {url}")
+                downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
+                if downloaded_thumbnail:
+                    if not downloaded_thumbnail.endswith('.webp'):
+                        convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
+                        downloaded_thumbnail = temp_media_thumbnail + ".webp"
+                    os.rename(downloaded_thumbnail, thumbnail_path)
+                    print(f"Saved Thumbnail as: {thumbnail_path}")
+                continue
 
-        success, ffmpeg_output = run_command(ffmpeg_cmd)
-        if success:
-            os.remove(downloaded_media_file)
-            print(f"Download: {duration_message}")
-            print(f"Saved {'Audio' if is_audio else 'Video'} as: {output_path}")
-            if downloaded_thumbnail:
-                os.rename(downloaded_thumbnail, thumbnail_path)
-                print(f"Saved Thumbnail as: {thumbnail_path}")
-        else:
-            print(f"Error: Failed to convert {'audio' if is_audio else 'video'}: {url}")
-            print(f"FFmpeg output: {ffmpeg_output}")
-            os.remove(downloaded_media_file)
-            if downloaded_thumbnail:
-                os.rename(downloaded_thumbnail, thumbnail_path)
-                print(f"Saved Thumbnail as: {thumbnail_path}")
+            downloaded_thumbnail = find_downloaded_thumbnail(temp_media_thumbnail)
+            if downloaded_thumbnail and not downloaded_thumbnail.endswith('.webp'):
+                convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
+                downloaded_thumbnail = temp_media_thumbnail + ".webp"
+
+            if trim_limit:
+                temp_trimmed_media = os.path.join(output_dir, f"temp_media_trimmed{media_ext}")
+                if trim_media(downloaded_media_file, temp_trimmed_media, trim_limit, is_audio):
+                    downloaded_media_file = temp_trimmed_media
+                else:
+                    safe_remove(downloaded_media_file)
+                    if downloaded_thumbnail:
+                        os.rename(downloaded_thumbnail, thumbnail_path)
+                        print(f"Saved Thumbnail as: {thumbnail_path}")
+                    continue
+
+            if is_audio:
+                ffmpeg_cmd = f'ffmpeg -i "{downloaded_media_file}" -c:a aac -b:a 128k -ar 44100 "{output_path}"'
+            else:
+                width, height = get_video_dimensions(downloaded_media_file)
+                width = width + (width % 2)
+                height = height + (height % 2)
+                aspect_ratio = width / height if height > 0 else 1
+                if aspect_ratio > 1.5:
+                    target_width, target_height = 1920, 1080
+                elif aspect_ratio < 0.67:
+                    target_width, target_height = 1080, 1920
+                else:
+                    target_width, target_height = 1080, 1080
+                target_width = target_width + (target_width % 2)
+                target_height = target_height + (target_height % 2)
+                ffmpeg_cmd = (
+                    f'ffmpeg -i "{downloaded_media_file}" -c:v libx264 -preset fast -b:v 3500k -r 30 '
+                    f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" '
+                    f'-c:a aac -b:a 128k -ar 44100 -pix_fmt yuv420p -t 140 "{output_path}"'
+                )
+
+            success, ffmpeg_output = run_command(ffmpeg_cmd)
+            if success:
+                safe_remove(downloaded_media_file)
+                print(f"Download: {duration_message}")
+                print(f"Saved {'Audio' if is_audio else 'Video'} as: {output_path}")
+                if downloaded_thumbnail:
+                    os.rename(downloaded_thumbnail, thumbnail_path)
+                    print(f"Saved Thumbnail as: {thumbnail_path}")
+            else:
+                print(f"Error: Failed to convert {'audio' if is_audio else 'video'}: {url}")
+                print(f"FFmpeg output: {ffmpeg_output}")
+                safe_remove(downloaded_media_file)
+                if downloaded_thumbnail:
+                    os.rename(downloaded_thumbnail, thumbnail_path)
+                    print(f"Saved Thumbnail as: {thumbnail_path}")
+        except Exception as e:
+            print(f"Error: Skipped processing {url} due to: {str(e)}")
+            for temp in [temp_media_file + ext for ext in [".m4a", ".opus", ".webm", ".mp3", ".mp4", ".mkv"]] + \
+                        [temp_media_thumbnail + ext for ext in [".webp", '.jpg', '.jpeg', '.png']]:
+                safe_remove(temp)
+            continue
 
 if __name__ == "__main__":
     main()
