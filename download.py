@@ -26,7 +26,7 @@ def run_command(command, suppress_errors=False):
         stdout=stdout,
         stderr=stderr,
         text=True,
-        errors='replace',  # Replace undecodable characters with �
+        errors='replace',
         bufsize=1,
         universal_newlines=True
     )
@@ -64,7 +64,7 @@ def safe_remove(file_path):
             return True
         except PermissionError:
             debug_print(f"Warning: PermissionError on attempt {attempt + 1} for {file_path}. Retrying...")
-            time.sleep(1)  # Wait before retrying
+            time.sleep(1)
     debug_print(f"Error: Failed to delete {file_path} after {max_attempts} attempts.")
     return False
 
@@ -92,7 +92,7 @@ def run_yt_dlp(params, output_path):
             'cookiesfrombrowser': ('firefox',),
             'writethumbnail': True,
             'postprocessors': params.get('postprocessors', []),
-            'clean_metadata': True,  # Strip problematic metadata
+            'clean_metadata': True,
         }
         ydl_opts.update({k: v for k, v in params.items() if k not in ['postprocessors', 'writethumbnail']})
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -288,6 +288,7 @@ def main():
                 convert_thumbnail_to_webp(downloaded_thumbnail, temp_media_thumbnail + ".webp")
                 downloaded_thumbnail = temp_media_thumbnail + ".webp"
 
+            # Handle trimming for both audio and video
             if trim_limit:
                 temp_trimmed_media = os.path.join(output_dir, f"temp_media_trimmed{media_ext}")
                 if trim_media(downloaded_media_file, temp_trimmed_media, trim_limit, is_audio):
@@ -299,6 +300,7 @@ def main():
                         print(f"Saved Thumbnail as: {thumbnail_path}")
                     continue
 
+            # Convert media to final format
             if is_audio:
                 ffmpeg_cmd = f'ffmpeg -i "{downloaded_media_file}" -c:a aac -b:a 128k -ar 44100 "{output_path}"'
             else:
@@ -317,7 +319,7 @@ def main():
                 ffmpeg_cmd = (
                     f'ffmpeg -i "{downloaded_media_file}" -c:v libx264 -preset fast -b:v 3500k -r 30 '
                     f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" '
-                    f'-c:a aac -b:a 128k -ar 44100 -pix_fmt yuv420p -t 140 "{output_path}"'
+                    f'-c:a aac -b:a 128k -ar 44100 -pix_fmt yuv420p "{output_path}"'
                 )
 
             success, ffmpeg_output = run_command(ffmpeg_cmd)
