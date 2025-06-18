@@ -13,6 +13,20 @@
  
 ## Commands
 
+## rename.py 
+
+--skipped (creates a .txt file incase errors)
+
+--metadata (attempts to extract and apply metadata to supported media files.)
+
+python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1
+
+python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped
+
+python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --metadata
+
+python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped --metadata
+
 ## download.py
 
 ## Download with custom name.
