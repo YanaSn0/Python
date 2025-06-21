@@ -19,17 +19,13 @@ python extract.py ./extract_in ./extract_out
 
 ## rename.py 
 
---skipped (creates a .txt file incase errors)
+--skipped Ceates a .txt file incase errors.
 
---metadata (attempts to extract and apply metadata to supported media files.)
+--metadata Change metadata of files.
 
-python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1
+--folder Puts everything in one folder
 
-python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped
-
-python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --metadata
-
-python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped --metadata
+python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped --metadata --folder 
 
 ## download.py
 
