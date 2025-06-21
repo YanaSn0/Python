@@ -134,8 +134,8 @@ def move_file(src, dest, metadata_dict=None, apply_metadata_flag=False, retries=
             time.sleep(delay)
     raise IOError(f"Unable to move after {retries} attempts: {src}")
 
-def process_files(folder_path, prefix, skipped, metadata):
-    abs_folder_path = os.path.abspath(folder_path).replace('/', os.sep).replace('\\', os.sep)
+def process_files(folder_path, prefix, skipped, metadata, flatten_to_folder):
+    abs_folder_path = os.path.abspath(folder_path).replace('/', os.sep)
     if not os.path.isdir(abs_folder_path):
         logger.error(f"'{abs_folder_path}' is not a directory.")
         sys.exit(1)
@@ -143,39 +143,58 @@ def process_files(folder_path, prefix, skipped, metadata):
     skipped_files = []
     processed_files = []
 
-    for filename in sorted(os.listdir(abs_folder_path), key=lambda x: x.lower()):
-        full_path = os.path.join(abs_folder_path, filename)
-        if not os.path.isfile(full_path):
+    # If flatten_to_folder is True, use a subfolder named after the prefix
+    if flatten_to_folder:
+        target_folder = os.path.join(abs_folder_path, sanitize_filename(prefix))
+    else:
+        target_folder = abs_folder_path
+
+    # Walk through folder and subfolders
+    for root, dirs, files in os.walk(abs_folder_path):
+        logger.info(f"Processing folder: {root}")
+        # Skip files in the target folder to avoid processing already moved files
+        if flatten_to_folder and os.path.abspath(root) == os.path.abspath(target_folder):
+            logger.info(f"Skipping target folder: {root}")
             continue
-        if is_file_locked(full_path):
-            skipped_files.append((filename, full_path, "File is locked"))
-            logger.error(f"Skipped {filename}: File is locked")
-            continue
+        # Sort files for consistent processing
+        for filename in sorted(files, key=lambda x: x.lower()):
+            # Skip system files like desktop.ini and thumbs.db
+            if filename.lower() in {'desktop.ini', 'thumbs.db'}:
+                logger.info(f"Skipped system file: {filename}")
+                continue
+            full_path = os.path.join(root, filename)
+            if not os.path.isfile(full_path):
+                continue
+            if is_file_locked(full_path):
+                skipped_files.append((filename, full_path, "File is locked"))
+                logger.error(f"Skipped {filename}: File is locked")
+                continue
 
-        ext = os.path.splitext(filename)[1] or '.unknown'
-        new_name = f"{prefix}{ext}"
-        new_path = os.path.join(abs_folder_path, new_name)
+            ext = os.path.splitext(filename)[1] or '.unknown'
+            new_name = f"{prefix}{ext}"
+            # Use target_folder (prefix-named folder or root) for destination
+            new_path = os.path.join(target_folder, new_name)
 
-        try:
-            metadata_dict = {}
-            if metadata:
-                metadata_dict, meta_error = get_metadata(full_path)
-                if meta_error:
-                    logger.warning(f"Metadata extraction failed for {filename}: {meta_error}")
-                    skipped_files.append((filename, full_path, f"Metadata extraction error: {meta_error}"))
+            try:
+                metadata_dict = {}
+                if metadata:
+                    metadata_dict, meta_error = get_metadata(full_path)
+                    if meta_error:
+                        logger.warning(f"Metadata extraction failed for {filename}: {meta_error}")
+                        skipped_files.append((filename, full_path, f"Metadata extraction error: {meta_error}"))
 
-            final_path = move_file(
-                full_path,
-                new_path,
-                metadata_dict=metadata_dict if metadata_dict else None,
-                apply_metadata_flag=metadata
-            )
-            processed_files.append((filename, final_path))
-            logger.info(f"Renamed {filename} to {os.path.basename(final_path)}")
+                final_path = move_file(
+                    full_path,
+                    new_path,
+                    metadata_dict=metadata_dict if metadata_dict else None,
+                    apply_metadata_flag=metadata
+                )
+                processed_files.append((filename, final_path))
+                logger.info(f"Renamed {filename} to {os.path.basename(final_path)}")
 
-        except Exception as e:
-            skipped_files.append((filename, full_path, f"Rename error: {str(e)}"))
-            logger.error(f"Skipped {filename}: {str(e)}")
+            except Exception as e:
+                skipped_files.append((filename, full_path, f"Rename error: {str(e)}"))
+                logger.error(f"Skipped {filename}: {str(e)}")
 
     if skipped and skipped_files:
         skipped_report_file = os.path.join(abs_folder_path, "skipped.txt")
@@ -199,18 +218,20 @@ def process_files(folder_path, prefix, skipped, metadata):
     logger.info(f"Processed {len(processed_files)} files")
 
 def main():
-    parser = argparse.ArgumentParser(description="Rename files in-place with a prefix")
-    parser.add_argument("prefix", help="Prefix for files")
-    parser.add_argument("folder_path", help="Folder path")
+    parser = argparse.ArgumentParser(description="Rename files with a prefix, optionally moving to a new folder named after the prefix")
+    parser.add_argument("prefix", help="Prefix for files and name of new folder if --folder is used")
+    parser.add_argument("folder_path", help="Folder path to process")
     parser.add_argument("--skipped", action="store_true", help="Generate skipped files report")
     parser.add_argument("--metadata", action="store_true", help="Apply metadata to files")
+    parser.add_argument("--folder", action="store_true", help="Move all files to a new folder named after the prefix")
     args = parser.parse_args()
 
     process_files(
         folder_path=args.folder_path,
         prefix=args.prefix,
         skipped=args.skipped,
-        metadata=args.metadata
+        metadata=args.metadata,
+        flatten_to_folder=args.folder
     )
 
 if __name__ == "__main__":
