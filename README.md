@@ -13,6 +13,10 @@
  
 ## Commands
 
+## extract.py Extract images from all videos in a folder into sub folders.
+
+python extract.py ./extract_in ./extract_out
+
 ## rename.py 
 
 --skipped (creates a .txt file incase errors)
