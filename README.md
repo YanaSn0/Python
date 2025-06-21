@@ -13,7 +13,9 @@
  
 ## Commands
 
-## extract.py Extract images from all videos in a folder into sub folders.
+## extract.py 
+
+Extract images from videos into sub folders.
 
 python extract.py ./extract_in ./extract_out
 
