@@ -15,7 +15,7 @@
 
 ## logo.py
 
-Place a custom .png specified from the right and bottom edge.
+This processes all .mp4 files in the logo folder in same folder as the script placing the watermark 5 pixels from the right and 5 pixels from the bottom.
 
 python logo.py ./logo 5 5
 
