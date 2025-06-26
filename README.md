@@ -11,24 +11,6 @@
 - The debug flags aren't needed.
 - Folders will be created if they don't already exist.
 
-## Loop Video
-
-## Trims and loops a video to a desired duration, outputs as .mp4.
-
-python process.py loop v ./videos/U1.mp4 --start 10 --end 20 --duration 60 --output-dir ./looped --debug  
-
-## Loop Audio from Video
-
-## Trims and loops audio from a video, outputs as .m4a.
-
-python process.py loop a ./videos/U1.mp4 --start 10 --end 20 --duration 60 --output-dir ./looped --debug  
-
-## Loop Audio File
-
-## Loops an audio file to a desired duration, outputs as .m4a.
-
-python process.py loopaudio ./audio/A1.m4a 60 --output-dir ./looped --debug  
-
 ## Split Video
 
 ## Splits a video into video (.mp4) and audio (.m4a) files.
