@@ -87,11 +87,15 @@ python download.py combined --output-dir ./combined --keep-original --debug
 
 ## Clears the output directory before downloading.
 
-python download.py audio --output-dir ./audio --clear-dir --debug  
+python download.py audio --output-dir ./audio --clear-dir --debug
+
+## combine.py
+
+## Combine audio and video.
+
+python combine.py ./trim ./trim
 
 ## process.py
-
-
 
 ## Trim Video
 
@@ -130,12 +134,6 @@ python process.py loopaudio ./audio/A1.m4a 60 --output-dir ./looped --debug
 ## Splits a video into video (.mp4) and audio (.m4a) files.
 
 python process.py split ./downloaded/YanaSn0w1_Video --debug
-
-## Combine Video and Audio
-
-## Combines video and audio files into a single:
-
-python process.py combine ./looped --output-dir ./combined --debug
 
 ## Slideshow Video from Pictures with specified delay:
 
