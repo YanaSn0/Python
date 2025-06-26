@@ -1,6 +1,6 @@
 Usage Examples
 
-Move Files (Original Behavior):
+##  Move Files (Original Behavior):
 
 python rename.py myprefix ./folder --folder --metadata --skipped
 
@@ -10,7 +10,7 @@ Output: ./folder/myprefix/myprefix.mp4 (original file moved, metadata applied, s
 
 Behavior: Moves files to a new folder named myprefix, renames them to myprefix.ext, applies metadata, and generates a skipped report.
 
-Copy Files (New Behavior with --copy):
+##  Copy Files (New Behavior with --copy):
 
 python rename.py myprefix ./folder --folder --metadata --skipped --copy
 
@@ -20,7 +20,7 @@ Output: ./folder/myprefix/myprefix.mp4 (original file preserved in ./folder, met
 
 Behavior: Copies files to a new folder named myprefix, renames them to myprefix.ext, applies metadata, and generates a skipped report.
 
-Rename in Place Without Folder:
+##  Rename in Place Without Folder:
 
 python rename.py myprefix ./folder --copy
 
@@ -30,7 +30,7 @@ Output: ./folder/myprefix.mp4 (original file preserved)
 
 Behavior: Copies files within the same folder, renaming them to myprefix.ext.
 
-Key Features
+##  Key Features
 Copy vs. Move: The --copy flag determines whether files are copied (shutil.copy2, preserving originals) or moved (shutil.move, deleting originals).
 
 Custom Prefix: Files are renamed with a user-specified prefix (e.g., myprefix.ext), with numerical suffixes for conflicts (e.g., myprefix_1.ext).
