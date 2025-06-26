@@ -21,11 +21,7 @@ Ensure watermark.png is in the same folder as the videos, and FFmpeg is installe
 
 python logo.py ./logo 5 5
 
-## extract.py 
 
-Extract images from videos into sub folders.
-
-python extract.py ./extract_in ./extract_out
 
 ## rename.py 
 
