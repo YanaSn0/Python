@@ -6,13 +6,13 @@ python trim.py a input_audio.mp3 --end-time 10
 
 python trim.py v input_video.mp4 --start-time 5 --end-time 15
 
-## First Argument: a for audio or v for video.
+First Argument: a for audio or v for video.
 
-## Second Argument: Input file path (e.g., input_audio.mp3 or input_video.mp4).
+Second Argument: Input file path (e.g., input_audio.mp3 or input_video.mp4).
 
-## Required Flag: --end-time specifies the end time in seconds.
+Required Flag: --end-time specifies the end time in seconds.
 
-## Example Output: A_1.mp4 (audio) or V_1.mp4 (video) in the output directory.
+Example Output: A_1.mp4 (audio) or V_1.mp4 (video) in the output directory.
 
 Flags:
 
