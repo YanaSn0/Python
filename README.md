@@ -13,6 +13,12 @@
  
 ## Commands
 
+## logo.py
+
+Place a custom .png specified from the right and bottom edge.
+
+python logo.py ./logo 5 5
+
 ## extract.py 
 
 Extract images from videos into sub folders.
