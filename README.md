@@ -11,20 +11,6 @@
 - The debug flags aren't needed.
 - Folders will be created if they don't already exist.
 
-## Trim Video
-
-## Trims a video to specified start and end times, outputs as .mp4.
-
-python process.py trim v ./videos/V1.mp4 --start 22 --end 27 --output-dir ./trimmed --debug
-
-## Trims Audio to specified start and end times, outputs as .m4a.
-
-python process.py trim a ./trim/A1.m4a --start 29 --end 40 --output-dir ./trim --debug
-
-## Extracts and trims audio from a video, outputs as .m4a.
-
-python process.py trim a ./videos/U1.mp4 --start 10 --end 20 --output-dir ./trimmed --debug  
-
 ## Loop Video
 
 ## Trims and loops a video to a desired duration, outputs as .mp4.
