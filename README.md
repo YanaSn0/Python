@@ -17,6 +17,8 @@
 
 This processes all .mp4 files in the logo folder in same folder as the script placing the watermark 5 pixels from the right and 5 pixels from the bottom.
 
+Ensure watermark.png is in the same folder as the videos, and FFmpeg is installed.
+
 python logo.py ./logo 5 5
 
 ## extract.py 
