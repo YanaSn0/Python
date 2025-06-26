@@ -1,3 +1,7 @@
+##  Purpose: Trims a video or audio file to a specified time range.
+
+Command:
+
 python trim.py a input_audio.mp3 --end-time 10
 
 python trim.py v input_video.mp4 --start-time 5 --end-time 15
