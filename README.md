@@ -10,38 +10,6 @@
 - Put the url in url.txt then save.
 - The debug flags aren't needed.
 - Folders will be created if they don't already exist.
- 
-## Commands
-
-## logo.py
-
-This processes all .mp4 files in the logo folder in same folder as the script placing the watermark 5 pixels from the right and 5 pixels from the bottom.
-
-Ensure watermark.png is in the same folder as the videos, and FFmpeg is installed.
-
-python logo.py ./logo 5 5
-
-
-
-## rename.py 
-
---skipped Ceates a .txt file incase errors.
-
---metadata Change metadata of files.
-
---folder Puts everything in one folder
-
-python rename.py YanaSn0w1 ./downloads/1_YanaSn0w1 --skipped --metadata --folder 
-
-
-
-## combine.py
-
-## Combine audio and video.
-
-python combine.py ./trim ./trim
-
-## process.py
 
 ## Trim Video
 
