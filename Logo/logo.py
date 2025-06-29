@@ -17,6 +17,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Get the directory where the script is located
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Define the logo folder path (subfolder named 'logo' in script directory)
+LOGO_FOLDER = os.path.join(SCRIPT_DIR, 'logo')
+
 def is_file_locked(file_path, retries=3, delay=4):
     """Check if a file is locked by attempting to open it."""
     for attempt in range(retries):
@@ -98,17 +103,21 @@ def apply_metadata(src_path, logo_path, dest_path, metadata_dict, x_offset, y_of
         return False, f"FFmpeg error: {str(e)}"
 
 def process_videos_in_folder(folder_path, prefix, logo_file, x_offset, y_offset, metadata=False, skipped=False):
-    """Process all .mp4 files in the folder, applying a watermark and renaming."""
+    """Process all .mp4 files in the folder, applying a watermark and saving to a subfolder."""
     abs_folder_path = os.path.abspath(folder_path).replace('/', os.sep)
     if not os.path.isdir(abs_folder_path):
         logger.error(f"Error: {abs_folder_path} is not a valid directory")
         sys.exit(1)
 
-    # Check for logo file
-    logo_path = os.path.join(abs_folder_path, logo_file)
+    # Check for logo file in the 'logo' subfolder of script directory
+    logo_path = os.path.join(LOGO_FOLDER, logo_file)
     if not os.path.exists(logo_path):
-        logger.error(f"Error: {logo_file} not found in {abs_folder_path}")
+        logger.error(f"Error: {logo_file} not found in {LOGO_FOLDER}")
         sys.exit(1)
+
+    # Create output folder named after the prefix
+    output_folder = os.path.join(abs_folder_path, prefix)
+    os.makedirs(output_folder, exist_ok=True)
 
     # Focus on .mp4 files
     videos = [f for f in os.listdir(abs_folder_path) if f.lower().endswith('.mp4')]
@@ -136,12 +145,12 @@ def process_videos_in_folder(folder_path, prefix, logo_file, x_offset, y_offset,
         logger.info(f"{video}: {width}x{height}")
 
         # Generate new filename with prefix
-        new_name = f"{prefix}{os.path.splitext(video)[1]}"
-        output_video = os.path.join(abs_folder_path, new_name)
+        new_name = f"{prefix}_{os.path.splitext(video)[0]}{os.path.splitext(video)[1]}"  # Add prefix to original filename
+        output_video = os.path.join(output_folder, new_name)
         counter = 1
         while os.path.exists(output_video):
             base, ext = os.path.splitext(new_name)
-            output_video = os.path.join(abs_folder_path, f"{base}_{counter}{ext}")
+            output_video = os.path.join(output_folder, f"{base}_{counter}{ext}")
             counter += 1
 
         # Get metadata if requested
@@ -177,7 +186,7 @@ def process_videos_in_folder(folder_path, prefix, logo_file, x_offset, y_offset,
 
     # Generate skipped files report if requested
     if skipped and skipped_files:
-        skipped_report_file = os.path.join(abs_folder_path, "skipped.txt")
+        skipped_report_file = os.path.join(output_folder, "skipped.txt")
         try:
             with open(skipped_report_file, 'w', encoding='utf-8') as f:
                 f.write("Skipped files:\n")
@@ -200,11 +209,11 @@ def process_videos_in_folder(folder_path, prefix, logo_file, x_offset, y_offset,
 def main():
     """Parse command-line arguments and process videos."""
     parser = argparse.ArgumentParser(description="Add a watermark to .mp4 files and rename with a prefix")
-    parser.add_argument("prefix", help="Prefix for output video filenames")
-    parser.add_argument("logo_file", help="Name of the logo file (e.g., logo1.png)")
+    parser.add_argument("prefix", help="Prefix for output video filenames and output folder")
+    parser.add_argument("logo_file", help="Name of the logo file (e.g., logo1.png) in the 'logo' subfolder")
     parser.add_argument("x_offset", type=int, help="X offset from right edge for watermark")
     parser.add_argument("y_offset", type=int, help="Y offset from bottom edge for watermark")
-    parser.add_argument("folder_path", help="Folder path containing .mp4 files and logo file")
+    parser.add_argument("folder_path", help="Folder path containing .mp4 files")
     parser.add_argument("--metadata", action="store_true", help="Apply metadata to output videos")
     parser.add_argument("--skipped", action="store_true", help="Generate skipped files report")
     args = parser.parse_args()
