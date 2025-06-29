@@ -1,20 +1,15 @@
-Purpose: Converts videos to a standard format (H.264, 30 fps, AAC audio).
+##  Convert all pic and vid in a folder and save them into sub folders with json log to avoid re processing.
 
-Command:
+Defaults to a universal codec for social media and jpg.
 
-python convert.py ./input_dirFirst Argument: Input directory or file path (supports wildcards, e.g., *.mp4).
+Lowering quality from 100 to 95 reduces file size by a lot if you care about that, the quality loss is unnoticable by the human eye.
 
-Example Output: U_1.mp4, U_2.mp4, etc., in the output directory.
+--p For only pic.
 
-Flags:
+--v For only vid.
 
---output-dir <path>: Output directory (default: current directory).
+--one_to_one Instead of --nine_sixteen for aspect ratio.
 
---debug: Enable verbose debug output.
+--crop Crops the image instead of looking for a close resolution to match the aspect ratio.
 
-Example:
-
-python convert.py ./videos --output-dir ./output
-
-Converts all .mp4 and .mkv files in ./videos to ./output/U_1.mp4, etc.
-
+python convert.py YanaSn0w1 ./downloads --output-dir ./downloads --debug --nine_sixteen
