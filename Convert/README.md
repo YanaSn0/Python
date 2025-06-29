@@ -1,6 +1,6 @@
 ##  Convert all pic and vid in a folder and save them into sub folders with json log to avoid re processing.
 
-Defaults to a universal codec for social media and jpg because webp cant be uploaded to Instagram.
+Defaults to a universal codec and jpg for social media becauses webp and other video format wont upload.
 
 Lowering quality from 100 to 95 reduces file size by a lot if you care about that, the quality loss is unnoticable by the human eye.
 
