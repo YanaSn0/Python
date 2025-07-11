@@ -4,7 +4,7 @@ Command:
 
 python trim.py a input_audio.mp3 --end-time 10
 
-python trim.py v input_video.mp4 --start-time 5 --end-time 15
+python trim.py v split/YanaSn0w1_Uni_245_full.mp4 --start-time 0 --end-time 5
 
 First Argument: a for audio or v for video.
 
