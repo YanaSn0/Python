@@ -16,8 +16,11 @@
 
 ## Usage
 python download_yt.py [full|audio] [--trim <seconds>] [--debug] [--output-dir <path>]
+
 Examples:
+
 python download_yt.py full --output-dir ./downloaded --debug
+
 python download_yt.py audio --trim 60 --output-dir ./audio
 
 ## Output
