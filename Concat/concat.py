@@ -6,6 +6,7 @@ import glob
 import json
 import time
 import shutil
+import re
 
 DEBUG = False
 
@@ -163,7 +164,7 @@ def main():
         debug_print(f"Unique videos: {unique_videos}")
         def get_number(file):
             base = os.path.basename(file)
-            match = re.search(r'Concat_(\d+)\.', base, re.I)
+            match = re.search(r'S(\d+)_', base, re.I)  # Extract number after 'S' and before '_'
             return int(match.group(1)) if match else float('inf')
         try:
             video_paths = sorted(unique_videos, key=get_number)
@@ -231,12 +232,15 @@ def main():
                 fade_in = index > 0
                 fade_out = index < len(actual_videos) - 1
                 fade_duration = 1.0
-                if fade_in and fade_out:
-                    video_filters.append(f"fade=t=in:st=0:d={fade_duration},fade=t=out:st={source_duration-fade_duration}:d={fade_duration}")
-                elif fade_in:
-                    video_filters.append(f"fade=t=in:st=0:d={fade_duration}")
-                elif fade_out:
-                    video_filters.append(f"fade=t=out:st={source_duration-fade_duration}:d={fade_duration}")
+                if source_duration < fade_duration:
+                    debug_print(f"Skipping fades for {video_path}: duration {source_duration}s is too short")
+                else:
+                    if fade_in and fade_out:
+                        video_filters.append(f"fade=t=in:st=0:d={fade_duration},fade=t=out:st={source_duration-fade_duration}:d={fade_duration}")
+                    elif fade_in:
+                        video_filters.append(f"fade=t=in:st=0:d={fade_duration}")
+                    elif fade_out:
+                        video_filters.append(f"fade=t=out:st={source_duration-fade_duration}:d={fade_duration}")
             video_filter_string = ",".join(video_filters)
             try:
                 if has_audio:
