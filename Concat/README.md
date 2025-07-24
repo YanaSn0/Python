@@ -2,6 +2,8 @@ Purpose: Concatenates multiple videos into a single video, with optional fade tr
 
 Command:
 
+python concat.py concat_in --output-dir concat_out --no-fades --debug
+
 python concat.py video1.mp4 video2.mp4
 
 python concat.py ./videos
