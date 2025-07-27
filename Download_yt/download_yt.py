@@ -3,33 +3,53 @@ import os
 import argparse
 import re
 import json
+import sys
+import shutil
 import time
 from datetime import datetime
+import logging
 
-DEBUG = False
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def debug_print(*args, **kwargs):
-    if DEBUG:
-        print(*args, **kwargs)
+def check_dependencies():
+    """Check if required tools are installed."""
+    for cmd in ["yt-dlp", "ffmpeg", "ffprobe"]:
+        if not shutil.which(cmd):
+            logging.error(f"{cmd} not found. Please install it.")
+            sys.exit(1)
 
-def run_command(command):
-    debug_print(f"Debug: Executing: {command}")
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
-    output = process.communicate()[0]
-    if process.returncode != 0:
-        debug_print(f"Error: Command failed: {output}")
-        return False, output
-    return True, output
+def run_command(command, timeout=600):
+    """Execute a shell command with a timeout and print output in real-time."""
+    logging.debug(f"Executing: {command}")
+    try:
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors='replace')
+        output_lines = []
+        for line in process.stdout:
+            print(line, end='')  # Print each line immediately to show progress
+            output_lines.append(line.strip())
+            logging.debug(line.strip())  # Log all output for verbose debugging
+        output = "\n".join(output_lines)
+        return True, output  # Assume success if output is captured, check title manually
+    except subprocess.TimeoutExpired:
+        logging.error(f"Command timed out after {timeout} seconds: {command}")
+        process.kill()
+        return False, "Timeout"
+    except Exception as e:
+        logging.error(f"Exception running command: {e}")
+        return False, str(e)
 
 def safe_remove(file_path):
+    """Safely delete a file."""
     try:
         if os.path.exists(file_path):
             os.remove(file_path)
-            debug_print(f"Deleted: {file_path}")
+            logging.debug(f"Deleted: {file_path}")
     except Exception as e:
-        debug_print(f"Error deleting {file_path}: {e}")
+        logging.error(f"Error deleting {file_path}: {e}")
 
 def get_video_dimensions(video_path):
+    """Get video dimensions using ffprobe."""
     cmd = f'ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of json "{video_path}"'
     success, output = run_command(cmd)
     if success:
@@ -38,87 +58,129 @@ def get_video_dimensions(video_path):
             if data.get('streams'):
                 return data['streams'][0]['width'], data['streams'][0]['height']
         except json.JSONDecodeError:
-            debug_print(f"Error parsing ffprobe output: {output}")
-    debug_print(f"Warning: Using default 1920x1080 for {video_path}")
+            logging.error(f"Error parsing ffprobe output: {output}")
+    logging.warning(f"Using default 1920x1080 for {video_path}")
     return 1920, 1080
 
 def sanitize_filename(filename):
+    """Sanitize filename by removing invalid characters."""
     invalid_chars = r'[<>:"/\\|?*]'
     sanitized = re.sub(invalid_chars, '_', filename)
     sanitized = re.sub(r'\s+', '_', sanitized.strip())
     return sanitized[:200]
 
-def get_next_available_name(output_dir, media_ext, title, current_number):
+def get_next_available_name(output_dir, media_ext, title, include_thumb=False):
+    """Generate unique filenames with title_trim_X pattern."""
     sanitized_name = sanitize_filename(title if title else "Untitled")
-    num = current_number
+    trim_number = 1
     while True:
-        media_name = f"{sanitized_name}_{num}{media_ext}"
-        thumb_name = f"{sanitized_name}_{num}_thumb.webp"
-        if not os.path.exists(os.path.join(output_dir, media_name)):
-            return media_name, thumb_name, num + 1
-        num += 1
+        media_name = f"{sanitized_name}_trim_{trim_number}{media_ext}"
+        thumb_name = f"{sanitized_name}_trim_{trim_number}_thumb.webp" if include_thumb else None
+        full_media_path = os.path.join(output_dir, media_name)
+        logging.debug(f"Checking if {full_media_path} exists")
+        if not os.path.exists(full_media_path):
+            logging.debug(f"Selected {media_name} as available")
+            return media_name, thumb_name, trim_number + 1
+        trim_number += 1
+        logging.debug(f"File exists, incrementing to trim_{trim_number}")
 
-def run_yt_dlp(url, output_path, is_audio=False):
-    cmd = f'yt-dlp "{url}" -o "{output_path}" --write-thumbnail --cookies-from-browser firefox'
+def run_yt_dlp(url, output_path, is_audio=False, start_time=0, duration=None, include_thumb=False):
+    """Run yt-dlp to download media with optional trimming and thumbnail."""
+    clean_url = re.sub(r'\?si=[^&]*', '', url)
+    cmd = f'yt-dlp "{clean_url}" -o "{output_path}" --geo-bypass --verbose'
     if is_audio:
-        cmd += ' --extract-audio --audio-format m4a --audio-quality 192k'
+        cmd += ' --extract-audio --audio-format m4a --audio-quality 192k --format bestaudio'
     else:
         cmd += ' --format "bestvideo+bestaudio/best" --merge-output-format mp4'
-    if DEBUG:
-        cmd += ' --verbose'
+    if duration:
+        cmd += f' --postprocessor-args "ffmpeg:-ss {start_time} -t {duration}"'
+    if not include_thumb:
+        cmd += ' --no-write-thumbnail'
     return run_command(cmd)
 
 def get_video_title(url):
-    cmd = f'yt-dlp "{url}" --get-title --cookies-from-browser firefox'
+    """Get video title using yt-dlp."""
+    clean_url = re.sub(r'\?si=[^&]*', '', url)
+    cmd = f'yt-dlp "{clean_url}" --get-title --geo-bypass'
     success, output = run_command(cmd)
-    return output.strip() if success else None
+    if output:  # Check if output contains the title, regardless of success flag
+        for line in output.split('\n'):
+            line = line.strip()
+            if line and not line.startswith('['):
+                return line
+    logging.warning("Failed to retrieve title, using 'Untitled' as fallback")
+    return "Untitled"
+
+def time_to_seconds(time_str):
+    """Convert HH:MM:SS or MM:SS format to seconds."""
+    try:
+        h, m, s = [float(x) for x in re.sub(r'^(\d+):(\d+):(\d+)$', r'\1:\2:\3', time_str).split(':')]
+        return int(h * 3600 + m * 60 + s)
+    except ValueError:
+        m, s = [float(x) for x in re.sub(r'^(\d+):(\d+)$', r'\1:\2', time_str).split(':')]
+        return int(m * 60 + s)
 
 def main():
-    global DEBUG
+    """Main function to download and process YouTube media."""
     parser = argparse.ArgumentParser(description="Download YouTube media from urls.txt")
     parser.add_argument("command", choices=["audio", "full"], default="full", help="Download audio or full video")
-    parser.add_argument("--trim", type=int, help="Seconds to trim")
+    parser.add_argument("--start", type=str, default="0:00", help="Start time in HH:MM:SS or MM:SS format")
+    parser.add_argument("--end", type=str, help="End time in HH:MM:SS or MM:SS format")
+    parser.add_argument("--thumb", action="store_true", help="Include thumbnail in output")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
     parser.add_argument("--output-dir", "-o", default="./downloaded", help="Output directory")
     args = parser.parse_args()
 
-    DEBUG = args.debug
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    check_dependencies()
     is_audio = args.command == "audio"
     output_dir = os.path.abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     url_file = "urls.txt"
     if not os.path.exists(url_file):
-        print(f"Error: {url_file} not found.")
+        logging.error(f"{url_file} not found.")
         sys.exit(1)
     with open(url_file, "r", encoding='utf-8') as f:
         urls = [url.strip() for line in f for url in line.split(";") if url.strip()]
     if not urls:
-        print(f"Error: {url_file} is empty.")
+        logging.error(f"{url_file} is empty.")
         sys.exit(1)
     unique_urls = list(dict.fromkeys(urls))
 
     current_number = 1
 
     for index, url in enumerate(unique_urls):
-        print(f"\nProcessing {'audio' if is_audio else 'video'} {index + 1}/{len(unique_urls)}: {url}")
-        # Use unique temp base name to avoid overwriting
-        shortcode = url.split('youtu.be/')[-1].split('?')[0]  # Extract video ID
+        logging.info(f"\nProcessing {'audio' if is_audio else 'video'} {index + 1}/{len(unique_urls)}: {url}")
+        shortcode = url.split('youtu.be/')[-1].split('?')[0]
         temp_media = os.path.join(output_dir, f"temp_media_{shortcode}")
         temp_files = [temp_media + ext for ext in [".m4a", ".mp4", ".webm", ".mkv", ".part", ".webp", ".jpg", ".jpeg", ".png"]]
         for temp in temp_files:
             safe_remove(temp)
 
         media_ext = ".m4a" if is_audio else ".mp4"
-        title = get_video_title(url) or f"Untitled_{index + 1}"
-        output_name, thumb_name, new_number = get_next_available_name(output_dir, media_ext, title, current_number)
+        title = get_video_title(url)
+        logging.debug(f"Initial title from output: {title}")
+        logging.debug(f"Final title before filename: {title}")
+        output_name, thumb_name, new_number = get_next_available_name(output_dir, media_ext, title, args.thumb)
         output_path = os.path.join(output_dir, output_name)
-        thumb_path = os.path.join(output_dir, thumb_name)
+        thumb_path = os.path.join(output_dir, thumb_name) if thumb_name else None
 
-        success, output = run_yt_dlp(url, temp_media + ".%(ext)s", is_audio)
+        # Convert start and end times to seconds
+        start_seconds = time_to_seconds(args.start)
+        end_seconds = time_to_seconds(args.end) if args.end else None
+        duration = end_seconds - start_seconds if end_seconds else None
+
+        if duration and duration <= 0:
+            logging.error(f"End time ({args.end}) must be after start time ({args.start})")
+            continue
+
+        success, output = run_yt_dlp(url, temp_media + ".%(ext)s", is_audio, start_seconds, duration, args.thumb)
         if not success:
-            print(f"Failed to download: {url}")
-            print(f"Output: {output}")
+            logging.error(f"Failed to download: {url}")
+            logging.error(f"Output: {output}")
             continue
 
         media_file = None
@@ -127,76 +189,33 @@ def main():
                 media_file = temp_media + ext
                 break
         if not media_file:
-            print(f"No media file for: {url}")
+            logging.error(f"No media file found for: {url}")
             continue
 
-        thumb_file = None
-        for ext in [".webp", ".jpg", ".jpeg", ".png"]:
-            if os.path.exists(temp_media + ext):  # Check temp_media.<ext> for thumbnail
-                thumb_file = temp_media + ext
-                break
-
-        if args.trim:
-            temp_trimmed = os.path.join(output_dir, f"temp_media_trimmed_{shortcode}{media_ext}")
-            codec = 'copy' if not is_audio else 'aac -b:a 192k'
-            stream_spec = '-vn' if is_audio else ''
-            ffmpeg_cmd = f'ffmpeg -i "{media_file}" {stream_spec} -t {args.trim} -c:v copy -c:a {codec} "{temp_trimmed}"'
-            success, ffmpeg_output = run_command(ffmpeg_cmd)
-            if success:
-                safe_remove(media_file)
-                media_file = temp_trimmed
-            else:
-                print(f"Failed to trim: {url}")
-                print(f"FFmpeg output: {ffmpeg_output}")
+        # Move temp file to final output path
+        if os.path.exists(media_file):
+            try:
+                shutil.move(media_file, output_path)
+                logging.info(f"Saved {'Audio' if is_audio else 'Video'}: {output_path}")
+            except Exception as e:
+                logging.error(f"Error moving {media_file} to {output_path}: {e}")
                 continue
-
-        if is_audio:
-            ffmpeg_cmd = f'ffmpeg -i "{media_file}" -c:a aac -b:a 192k -ar 44100 "{output_path}"'
         else:
-            width, height = get_video_dimensions(media_file)
-            width = width + (width % 2)
-            height = height + (height % 2)
-            aspect_ratio = width / height if height > 0 else 1
-            if aspect_ratio > 1.5:
-                target_width, target_height = 1920, 1080
-            elif aspect_ratio < 0.67:
-                target_width, target_height = 1080, 1920
-            else:
-                target_width, target_height = 1080, 1080
-            ffmpeg_cmd = (
-                f'ffmpeg -i "{media_file}" -c:v libx264 -preset fast -b:v 3500k -r 30 '
-                f'-vf "scale={target_width}:{target_height}:force_original_aspect_ratio=decrease,pad={target_width}:{target_height}:(ow-iw)/2:(oh-ih)/2" '
-                f'-c:a aac -b:a 192k -ar 44100 -pix_fmt yuv420p "{output_path}"'
-            )
+            logging.error(f"Media file {media_file} not created")
+            continue
 
-        success, ffmpeg_output = run_command(ffmpeg_cmd)
-        if success:
-            safe_remove(media_file)
-            print(f"Saved {'Audio' if is_audio else 'Video'}: {output_path}")
-            if thumb_file:
-                if not thumb_file.endswith('.webp'):
-                    thumb_temp = temp_media + ".webp"
-                    success, convert_output = run_command(f'ffmpeg -i "{thumb_file}" -c:v libwebp "{thumb_temp}"')
-                    if success:
-                        safe_remove(thumb_file)
-                        thumb_file = thumb_temp
-                    else:
-                        debug_print(f"Failed to convert thumbnail to WebP: {convert_output}")
-                try:
-                    if os.path.exists(thumb_path):
-                        safe_remove(thumb_path)
-                    os.rename(thumb_file, thumb_path)
-                    print(f"Saved Thumbnail: {thumb_path}")
-                except Exception as e:
-                    debug_print(f"Error renaming thumbnail {thumb_file} to {thumb_path}: {e}")
-            current_number = new_number
-        else:
-            print(f"Failed to convert: {url}")
-            print(f"FFmpeg output: {ffmpeg_output}")
+        if thumb_path and os.path.exists(temp_media + ".webp"):
+            thumb_file = temp_media + ".webp"
+            try:
+                shutil.move(thumb_file, thumb_path)
+                logging.info(f"Saved Thumbnail: {thumb_path}")
+            except Exception as e:
+                logging.error(f"Error moving thumbnail {thumb_file} to {thumb_path}: {e}")
 
-        # Clean up all temporary files
         for temp in temp_files:
             safe_remove(temp)
+
+        current_number = new_number
 
 if __name__ == "__main__":
     main()
