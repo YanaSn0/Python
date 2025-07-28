@@ -56,10 +56,10 @@ def run_command(command, suppress_errors=False, timeout=None, retries=1):
             if process.poll() is None:
                 process.terminate()
 
-def get_next_available_name(output_dir, prefix, extension, start_number=1):
+def get_next_available_name(output_dir, start_number=1):
     number = start_number
     while True:
-        name = f"{prefix}_{number}{extension}"
+        name = f"S_{number}{'.mp4'}"
         full_path = os.path.join(output_dir, name)
         if not os.path.exists(full_path):
             return name, full_path, number + 1
@@ -234,7 +234,7 @@ def main():
         os.makedirs(temp_dir)
     try:
         for i, image_path in enumerate(actual_paths, 1):
-            name, output_path, _ = get_next_available_name(output_dir, f"S{i}", ".mp4", start_number=i)
+            name, output_path, next_number = get_next_available_name(output_dir, start_number=i)
             debug_print(f"Processing image {image_path} to {output_path}")
             if keep_original_resolution:
                 width, height = get_image_dimensions(image_path)
