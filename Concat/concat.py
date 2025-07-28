@@ -164,8 +164,12 @@ def main():
         debug_print(f"Unique videos: {unique_videos}")
         def get_number(file):
             base = os.path.basename(file)
-            match = re.search(r'S(\d+)_', base, re.I)  # Extract number after 'S' and before '_'
-            return int(match.group(1)) if match else float('inf')
+            match = re.search(r'S_(\d+)\.mp4', base, re.I)  # Updated regex
+            if match:
+                debug_print(f"Extracted number {match.group(1)} from {base}")
+                return int(match.group(1))
+            debug_print(f"No number extracted from {base}, using infinity")
+            return float('inf')
         try:
             video_paths = sorted(unique_videos, key=get_number)
             debug_print(f"Sorted videos: {video_paths}")
@@ -219,7 +223,7 @@ def main():
     try:
         processed_videos = []
         for index, (video_path, source_duration) in enumerate(zip(actual_videos, source_durations)):
-            temp_output_path = os.path.join(temp_dir, f"temp_{index:03d}.mp4")
+            temp_output_path = os.path.join(temp_dir, f"temp_{index:05d}.mp4")
             has_audio = has_audio_stream(video_path)
             debug_print(f"Processing video {index}: {video_path}, Duration: {source_duration}s, Has audio: {has_audio}")
             video_filters = [
@@ -280,6 +284,8 @@ def main():
                 for video in processed_videos:
                     f.write(f"file '{os.path.abspath(video)}'\n")
             debug_print(f"Created concat list: {concat_list}")
+            with open(concat_list, "r") as f:
+                debug_print(f"Concat list contents:\n{f.read()}")
         except Exception as e:
             print(f"Concat list error: {e}")
             sys.exit(1)
