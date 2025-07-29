@@ -44,7 +44,7 @@ python concat_videos.py <video_paths> [--output-dir DIR] [--resolution WIDTHxHEI
 ### Examples
 - Concatenate videos:
   ```bash
-  python concat_videos.py video1.mp4 video2.mp4 --output-dir output
+  python concat.py video1.mp4 video2.mp4 --output-dir output
   ```
 - Directory, vertical video:
   ```bash
@@ -52,7 +52,7 @@ python concat_videos.py <video_paths> [--output-dir DIR] [--resolution WIDTHxHEI
   ```
 - No fades, debug:
   ```bash
-  python concat_videos.py video1.mp4 video2.mp4 --no-fades --debug
+  python concat.py video1.mp4 video2.mp4 --no-fades --debug
   ```
 
 Output: `Concat_N.mp4` in the specified directory.
