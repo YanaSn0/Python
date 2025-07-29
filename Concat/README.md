@@ -1,6 +1,3 @@
-Below is a concise README for your GitHub repository, tailored for the `concat_videos.py` script with the `--resolution` flag and high-quality settings. It's streamlined for easy copy-pasting while covering essentials.
-
-```markdown
 # Video Concatenation Script
 
 Concatenates multiple video files into a single high-quality video using FFmpeg. Supports custom resolutions, fade transitions, and consistent audio/video output.
@@ -109,5 +106,3 @@ MIT License. See [LICENSE](LICENSE).
    SOFTWARE.
    ```
 4. **File Structure**: Ensure `concat_videos.py`, `README.md`, and `LICENSE` are in the repo root.
-
-This README is compact yet informative, covering setup, usage, and resolution guidance. If you need further tweaks or have specific platform requirements, let me know!
