@@ -48,7 +48,7 @@ python concat_videos.py <video_paths> [--output-dir DIR] [--resolution WIDTHxHEI
   ```
 - Directory, vertical video:
   ```bash
-  python concat_videos.py /path/to/videos --resolution 1080x1920 --output-dir output
+  python concat.py pc/concat_in --output-dir pc/concat_out --resolution 1080x1920 --debug 
   ```
 - No fades, debug:
   ```bash
