@@ -18,6 +18,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Define supported extensions
+PICTURE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp'}
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.mpeg', '.mpg'}
+
+def check_dependencies():
+    """Check if ffmpeg and ffprobe are installed."""
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        logger.error("ffmpeg or ffprobe not found. Please install them.")
+        sys.exit(1)
+
 def is_file_locked(file_path, retries=3, delay=4):
     for attempt in range(retries):
         try:
@@ -149,11 +159,23 @@ def process_files(folder_path, prefix, skipped, metadata, flatten_to_folder, cop
     skipped_files = []
     processed_files = []
 
-    target_folder = os.path.join(abs_folder_path, sanitize_filename(prefix)) if flatten_to_folder else None
+    # Create target folders
+    pictures_folder = os.path.join(abs_folder_path, f"{sanitize_filename(prefix)}_Pictures") if flatten_to_folder else None
+    videos_folder = os.path.join(abs_folder_path, f"{sanitize_filename(prefix)}_Videos") if flatten_to_folder else None
+    other_folder = os.path.join(abs_folder_path, sanitize_filename(prefix)) if flatten_to_folder else None
+
+    if flatten_to_folder:
+        if pictures_folder:
+            os.makedirs(pictures_folder, exist_ok=True)
+        if videos_folder:
+            os.makedirs(videos_folder, exist_ok=True)
+        if other_folder:
+            os.makedirs(other_folder, exist_ok=True)
 
     for root, dirs, files in os.walk(abs_folder_path):
         logger.info(f"Processing folder: {root}")
-        if flatten_to_folder and target_folder and os.path.abspath(root) == os.path.abspath(target_folder):
+        # Skip target folders to avoid recursion
+        if flatten_to_folder and any(os.path.abspath(root) == os.path.abspath(f) for f in [pictures_folder, videos_folder, other_folder] if f):
             logger.info(f"Skipping target folder: {root}")
             continue
         for filename in sorted(files, key=lambda x: x.lower()):
@@ -168,9 +190,19 @@ def process_files(folder_path, prefix, skipped, metadata, flatten_to_folder, cop
                 logger.error(f"Skipped {filename}: File is locked")
                 continue
 
-            ext = os.path.splitext(filename)[1] or '.unknown'
+            ext = os.path.splitext(filename)[1].lower() or '.unknown'
             new_name = f"{prefix}{ext}"
-            new_path = os.path.join(target_folder, new_name) if flatten_to_folder else os.path.join(root, new_name)
+
+            # Determine target folder based on extension
+            if flatten_to_folder:
+                if ext in PICTURE_EXTENSIONS:
+                    new_path = os.path.join(pictures_folder, new_name)
+                elif ext in VIDEO_EXTENSIONS:
+                    new_path = os.path.join(videos_folder, new_name)
+                else:
+                    new_path = os.path.join(other_folder, new_name)
+            else:
+                new_path = os.path.join(root, new_name)
 
             try:
                 metadata_dict = {}
@@ -224,14 +256,23 @@ def process_files(folder_path, prefix, skipped, metadata, flatten_to_folder, cop
     logger.info(f"Processed {len(processed_files)} files")
 
 def main():
-    parser = argparse.ArgumentParser(description="Rename or copy files with a prefix, optionally moving to a new folder named after the prefix")
-    parser.add_argument("prefix", help="Prefix for files and name of new folder if --folder is used")
+    parser = argparse.ArgumentParser(description="Rename or copy files with a prefix, optionally moving to Pictures, Videos, or Other folders")
+    parser.add_argument("prefix", help="Prefix for files and name of new folders if --folder is used")
     parser.add_argument("folder_path", help="Folder path to process")
     parser.add_argument("--skipped", action="store_true", help="Generate skipped files report")
     parser.add_argument("--metadata", action="store_true", help="Apply metadata to files")
-    parser.add_argument("--folder", action="store_true", help="Move or copy all files to a new folder named after the prefix")
+    parser.add_argument("--folder", action="store_true", help="Move or copy files to <prefix>_Pictures, <prefix>_Videos, or <prefix> folders")
     parser.add_argument("--copy", action="store_true", help="Copy files instead of moving them")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     args = parser.parse_args()
+
+    # Set logging level based on --verbose
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    # Check dependencies if metadata is enabled
+    if args.metadata:
+        check_dependencies()
 
     process_files(
         folder_path=args.folder_path,
