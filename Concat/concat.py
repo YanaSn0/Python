@@ -137,8 +137,19 @@ def main():
     parser.add_argument("--output-dir", help="Output directory")
     parser.add_argument("--no-fades", action="store_true", help="Disable fade transitions")
     parser.add_argument("--debug", action="store_true", help="Enable debug output")
+    parser.add_argument("--resolution", default="1920x1080", help="Target resolution (e.g., 1920x1080)")
     args = parser.parse_args()
     DEBUG = args.debug
+
+    # Parse resolution
+    try:
+        target_width, target_height = map(int, args.resolution.split('x'))
+        if target_width % 2 != 0 or target_height % 2 != 0:
+            raise ValueError("Resolution dimensions must be even")
+        debug_print(f"Target resolution: {target_width}x{target_height}")
+    except ValueError as e:
+        print(f"Error: Invalid resolution format '{args.resolution}'. Use WIDTHxHEIGHT (e.g., 1920x1080). Error: {e}")
+        sys.exit(1)
 
     video_paths = args.video_paths
     output_dir = args.output_dir or "."
@@ -164,7 +175,7 @@ def main():
         debug_print(f"Unique videos: {unique_videos}")
         def get_number(file):
             base = os.path.basename(file)
-            match = re.search(r'S_(\d+)\.mp4', base, re.I)  # Updated regex
+            match = re.search(r'S_(\d+)\.mp4', base, re.I)
             if match:
                 debug_print(f"Extracted number {match.group(1)} from {base}")
                 return int(match.group(1))
@@ -202,21 +213,6 @@ def main():
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         debug_print(f"Created output directory: {output_dir}")
-    try:
-        width, height = get_video_dimensions(actual_videos[0])
-        width += width % 2
-        height += height % 2
-        aspect_ratio = width / height
-        if aspect_ratio > 1.5:
-            target_width, target_height = 1920, 1080
-        elif aspect_ratio < 0.67:
-            target_width, target_height = 1080, 1920
-        else:
-            target_width, target_height = 1080, 1080
-        debug_print(f"Target resolution: {target_width}x{target_height}")
-    except Exception as e:
-        print(f"Error getting dimensions: {e}")
-        sys.exit(1)
     temp_dir = os.path.abspath(os.path.join(".", "temp"))
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
@@ -250,9 +246,9 @@ def main():
                 if has_audio:
                     ffmpeg_command = (
                         f'ffmpeg -y -i "{video_path}" '
-                        f'-c:v libx264 -preset ultrafast -b:v 3500k -r 30 -pix_fmt yuv420p '
+                        f'-c:v libx264 -preset veryslow -b:v 5000k -r 30 -pix_fmt yuv420p '
                         f'-force_key_frames "expr:gte(t,n_forced*2)" '
-                        f'-c:a aac -b:a 128k -ar 48000 -ac 2 '
+                        f'-c:a aac -b:a 192k -ar 48000 -ac 2 '
                         f'-vf "{video_filter_string}" '
                         f'-t {source_duration} '
                         f'"{temp_output_path}"'
@@ -261,15 +257,15 @@ def main():
                     ffmpeg_command = (
                         f'ffmpeg -y -i "{video_path}" '
                         f'-f lavfi -i anullsrc=channel_layout=stereo:sample_rate=48000 '
-                        f'-c:v libx264 -preset ultrafast -b:v 3500k -r 30 -pix_fmt yuv420p '
+                        f'-c:v libx264 -preset veryslow -b:v 5000k -r 30 -pix_fmt yuv420p '
                         f'-force_key_frames "expr:gte(t,n_forced*2)" '
-                        f'-c:a aac -b:a 128k -ar 48000 -ac 2 -shortest '
+                        f'-c:a aac -b:a 192k -ar 48000 -ac 2 -shortest '
                         f'-vf "{video_filter_string}" '
                         f'-t {source_duration} '
                         f'"{temp_output_path}"'
                     )
                 debug_print(f"FFmpeg command: {ffmpeg_command}")
-                success, output = run_command(ffmpeg_command, timeout=60, retries=1)
+                success, output = run_command(ffmpeg_command, timeout=300, retries=1)
                 if not success or not os.path.exists(temp_output_path):
                     print(f"Preprocess failed for {video_path}: {output}")
                     sys.exit(1)
@@ -294,12 +290,12 @@ def main():
         try:
             ffmpeg_command = (
                 f'ffmpeg -y -f concat -safe 0 -i "{concat_list}" '
-                f'-c:v libx264 -preset ultrafast -b:v 3500k -r 30 -pix_fmt yuv420p '
-                f'-c:a aac -b:a 128k -ar 48000 -ac 2 '
+                f'-c:v libx264 -preset veryslow -b:v 5000k -r 30 -pix_fmt yuv420p '
+                f'-c:a aac -b:a 192k -ar 48000 -ac 2 '
                 f'"{output_path}"'
             )
             debug_print(f"FFmpeg concat command: {ffmpeg_command}")
-            success, output = run_command(ffmpeg_command, timeout=300, retries=1)
+            success, output = run_command(ffmpeg_command, timeout=600, retries=1)
             if success:
                 print(f"Saved as {output_path.replace(os.sep, '/')}")
             else:
