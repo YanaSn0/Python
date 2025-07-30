@@ -49,6 +49,12 @@ python slideshow.py 5.0 images img1-img5 --output-dir output --debug
 ```
 This creates 5-second video slides from `img1` to `img5` in the `images` directory, saving them to the `output` directory with debug output.
 
+### Example 2
+```bash
+python slide.py 5 ./pc/slide_in --output-dir ./pc/slide_out
+```
+This creates 5-second video slides from all image in a directory, saving them to the `output` directory with debug output.
+
 ## Output
 - Video slides saved as `<image_name>_slide.mp4` in the output directory.
 - Metadata saved as `slideshow_metadata.json` to track input images and output videos.
