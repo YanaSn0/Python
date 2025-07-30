@@ -58,10 +58,3 @@ This processes all `.mp4` files in `pc/concat_in`, outputs the concatenated vide
 
 ## License
 MIT License - see [LICENSE](LICENSE) for details.
-```
-
-### Notes
-- **Placeholder**: Replace `<your-username>/<your-repo>` with your actual GitHub username and repository name.
-- **License**: The README assumes an MIT License, which is common for open-source projects. Create a `LICENSE` file in your repository with the full MIT License text if you choose to use it.
-- **Conciseness**: The README is kept short but includes critical information for users to understand and use the script.
-- **Customization**: If you have specific details (e.g., known issues, additional features, or contact info), you can add them under a new section like `Contributing` or `Support`.
